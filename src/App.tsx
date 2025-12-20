@@ -2007,6 +2007,263 @@ const App = () => {
       );
     };
 
+    const renderResidentsSection = () => {
+      // Trier les résidents par numéro de chambre
+      const residentsTries = [...residents].sort((a, b) => {
+        const chambreA = parseInt(a.chambre) || 0;
+        const chambreB = parseInt(b.chambre) || 0;
+        return chambreA - chambreB;
+      });
+
+      if (editingResident || newResident) {
+        const resident = editingResident || {
+          nom: '',
+          prenom: '',
+          age: '',
+          chambre: '',
+          gir: '',
+          regimeAlimentaire: '',
+          medecin: { nom: '', tel: '' },
+          proche: { nom: '', tel: '' },
+          besoins: ''
+        };
+
+        return (
+          <div className="bg-white rounded-xl shadow-md p-6">
+            <h3 className="text-xl font-semibold text-gray-800 mb-4">
+              {newResident ? 'Nouveau Résident' : 'Modifier le Résident'}
+            </h3>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Nom</label>
+                  <input
+                    type="text"
+                    defaultValue={resident.nom}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Prénom</label>
+                  <input
+                    type="text"
+                    defaultValue={resident.prenom}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Âge</label>
+                  <input
+                    type="number"
+                    defaultValue={resident.age}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">N° Chambre</label>
+                  <input
+                    type="text"
+                    defaultValue={resident.chambre}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Niveau GIR</label>
+                  <select
+                    defaultValue={resident.gir}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                  >
+                    <option value="">Sélectionner un GIR</option>
+                    <option value="GIR 1">GIR 1 - Dépendance totale</option>
+                    <option value="GIR 2">GIR 2 - Dépendance importante</option>
+                    <option value="GIR 3">GIR 3 - Dépendance partielle</option>
+                    <option value="GIR 4">GIR 4 - Dépendance modérée</option>
+                    <option value="GIR 5">GIR 5 - Dépendance légère</option>
+                    <option value="GIR 6">GIR 6 - Autonome</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Régime Alimentaire</label>
+                  <input
+                    type="text"
+                    defaultValue={resident.regimeAlimentaire}
+                    placeholder="Ex: Sans sel, sans sucre..."
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                  />
+                </div>
+              </div>
+              <div className="border-t pt-4">
+                <h4 className="font-semibold text-gray-800 mb-3">Médecin Traitant</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Nom</label>
+                    <input
+                      type="text"
+                      defaultValue={resident.medecin.nom}
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Téléphone</label>
+                    <input
+                      type="tel"
+                      defaultValue={resident.medecin.tel}
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="border-t pt-4">
+                <h4 className="font-semibold text-gray-800 mb-3">Proche à Contacter</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Nom</label>
+                    <input
+                      type="text"
+                      defaultValue={resident.proche.nom}
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Téléphone</label>
+                    <input
+                      type="tel"
+                      defaultValue={resident.proche.tel}
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Besoins Spécifiques</label>
+                <textarea
+                  defaultValue={resident.besoins}
+                  placeholder="Décrivez les besoins particuliers..."
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 h-24"
+                ></textarea>
+              </div>
+              <div className="flex gap-3">
+                <button className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg flex items-center justify-center gap-2">
+                  <Save size={18} />
+                  Enregistrer
+                </button>
+                <button
+                  onClick={() => {
+                    setEditingResident(null);
+                    setNewResident(false);
+                  }}
+                  className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 rounded-lg"
+                >
+                  Annuler
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-bold text-gray-800">Gestion des Résidents</h2>
+            <button
+              onClick={() => setNewResident(true)}
+              className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-6 rounded-xl transition-colors flex items-center gap-2"
+            >
+              <Plus size={20} />
+              Ajouter un Résident
+            </button>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-md p-4">
+            <p className="text-sm text-gray-600 mb-2">
+              <span className="font-semibold">{residents.length}</span> résident(s) • Classés par numéro de chambre
+            </p>
+          </div>
+
+          {residentsTries.map(resident => (
+            <div key={resident.id} className="bg-white rounded-xl shadow-md p-6">
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <div className="flex items-center gap-3 mb-1">
+                    <span className="px-3 py-1 bg-purple-600 text-white rounded-full text-sm font-bold">
+                      Chambre {resident.chambre}
+                    </span>
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-800 mt-2">
+                    {resident.prenom} {resident.nom}
+                  </h3>
+                  <p className="text-gray-600">{resident.age} ans</p>
+                  <div className="flex gap-3 mt-2">
+                    <span className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-sm font-medium">
+                      {resident.gir}
+                    </span>
+                    {resident.regimeAlimentaire && (
+                      <span className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-sm font-medium">
+                        🍽️ {resident.regimeAlimentaire}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setEditingResident(resident)}
+                    className="p-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg"
+                    title="Modifier"
+                  >
+                    <Edit size={18} />
+                  </button>
+                  <button 
+                    onClick={() => {
+                      if (confirm('Êtes-vous sûr de vouloir supprimer ce résident ?')) {
+                        setResidents(residents.filter(r => r.id !== resident.id));
+                      }
+                    }}
+                    className="p-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg"
+                    title="Supprimer"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h4 className="font-semibold text-gray-800 mb-2">Médecin Traitant</h4>
+                  <p className="text-sm text-gray-700">{resident.medecin.nom}</p>
+                  <p className="text-sm text-gray-600">{resident.medecin.tel}</p>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h4 className="font-semibold text-gray-800 mb-2">Proche à Contacter</h4>
+                  <p className="text-sm text-gray-700">{resident.proche.nom}</p>
+                  <p className="text-sm text-gray-600">{resident.proche.tel}</p>
+                </div>
+              </div>
+
+              {resident.besoins && (
+                <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg mt-4">
+                  <h4 className="font-semibold text-gray-800 mb-2">Besoins Spécifiques</h4>
+                  <p className="text-sm text-gray-700">{resident.besoins}</p>
+                </div>
+              )}
+            </div>
+          ))}
+
+          {residents.length === 0 && (
+            <div className="bg-white rounded-xl shadow-md p-8 text-center">
+              <User size={48} className="mx-auto text-gray-400 mb-4" />
+              <p className="text-gray-600">Aucun résident enregistré</p>
+              <p className="text-sm text-gray-500 mt-2">Cliquez sur "Ajouter un Résident" pour commencer</p>
+            </div>
+          )}
+        </div>
+      );
+    };
+
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-100">
         <div className="bg-white shadow-md">
@@ -2096,6 +2353,17 @@ const App = () => {
               <Utensils size={18} className="inline mr-2" />
               Restauration
             </button>
+            <button
+              onClick={() => setActiveResidenceScreen('residents')}
+              className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
+                activeResidenceScreen === 'residents'
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-white text-purple-600 hover:bg-purple-50'
+              }`}
+            >
+              <User size={18} className="inline mr-2" />
+              Résidents
+            </button>
           </div>
 
           {activeResidenceScreen === 'dashboard' && renderResidenceDashboard()}
@@ -2105,6 +2373,7 @@ const App = () => {
           {activeResidenceScreen === 'planning' && renderPlanningSection()}
           {activeResidenceScreen === 'personnel' && renderPersonnelSection()}
           {activeResidenceScreen === 'restauration' && renderRestaurationSection()}
+          {activeResidenceScreen === 'residents' && renderResidentsSection()}
         </div>
       </div>
     );
@@ -2747,197 +3016,32 @@ const App = () => {
     );
   };
 
+  // Écran résident pour l'espace famille (LECTURE SEULE)
   const renderResident = () => {
-    if (editingResident || newResident) {
-      const resident = editingResident || {
-        nom: '',
-        prenom: '',
-        age: '',
-        chambre: '',
-        gir: '',
-        regimeAlimentaire: '',
-        medecin: { nom: '', tel: '' },
-        proche: { nom: '', tel: '' },
-        besoins: ''
-      };
-
-      return (
-        <div className="bg-white rounded-xl shadow-md p-6">
-          <h3 className="text-xl font-semibold text-gray-800 mb-4">
-            {newResident ? 'Nouveau Résident' : 'Modifier le Résident'}
-          </h3>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Nom</label>
-                <input
-                  type="text"
-                  defaultValue={resident.nom}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Prénom</label>
-                <input
-                  type="text"
-                  defaultValue={resident.prenom}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Âge</label>
-                <input
-                  type="number"
-                  defaultValue={resident.age}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">N° Chambre</label>
-                <input
-                  type="text"
-                  defaultValue={resident.chambre}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Niveau GIR</label>
-                <select
-                  defaultValue={resident.gir}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
-                >
-                  <option value="">Sélectionner un GIR</option>
-                  <option value="GIR 1">GIR 1 - Dépendance totale</option>
-                  <option value="GIR 2">GIR 2 - Dépendance importante</option>
-                  <option value="GIR 3">GIR 3 - Dépendance partielle</option>
-                  <option value="GIR 4">GIR 4 - Dépendance modérée</option>
-                  <option value="GIR 5">GIR 5 - Dépendance légère</option>
-                  <option value="GIR 6">GIR 6 - Autonome</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Régime Alimentaire</label>
-                <input
-                  type="text"
-                  defaultValue={resident.regimeAlimentaire}
-                  placeholder="Ex: Sans sel, sans sucre..."
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
-                />
-              </div>
-            </div>
-            <div className="border-t pt-4">
-              <h4 className="font-semibold text-gray-800 mb-3">Médecin Traitant</h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Nom</label>
-                  <input
-                    type="text"
-                    defaultValue={resident.medecin.nom}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Téléphone</label>
-                  <input
-                    type="tel"
-                    defaultValue={resident.medecin.tel}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2"
-                  />
-                </div>
-              </div>
-            </div>
-            <div className="border-t pt-4">
-              <h4 className="font-semibold text-gray-800 mb-3">Proche à Contacter</h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Nom</label>
-                  <input
-                    type="text"
-                    defaultValue={resident.proche.nom}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Téléphone</label>
-                  <input
-                    type="tel"
-                    defaultValue={resident.proche.tel}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2"
-                  />
-                </div>
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Besoins Spécifiques</label>
-              <textarea
-                defaultValue={resident.besoins}
-                placeholder="Décrivez les besoins particuliers..."
-                className="w-full border border-gray-300 rounded-lg px-4 py-2 h-24"
-              ></textarea>
-            </div>
-            <div className="flex gap-3">
-              <button className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg flex items-center justify-center gap-2">
-                <Save size={18} />
-                Enregistrer
-              </button>
-              <button
-                onClick={() => {
-                  setEditingResident(null);
-                  setNewResident(false);
-                }}
-                className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 rounded-lg"
-              >
-                Annuler
-              </button>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
     return (
       <div className="space-y-6">
-        <button
-          onClick={() => setNewResident(true)}
-          className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-6 rounded-xl transition-colors flex items-center justify-center gap-2"
-        >
-          <Plus size={20} />
-          Ajouter un Résident
-        </button>
+        <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 mb-4">
+          <p className="text-indigo-800 text-sm">
+            ℹ️ Ces informations sont gérées par la résidence. Contactez l'établissement pour toute modification.
+          </p>
+        </div>
 
         {residents.map(resident => (
           <div key={resident.id} className="bg-white rounded-xl shadow-md p-6">
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <h3 className="text-2xl font-bold text-gray-800">
-                  {resident.prenom} {resident.nom}
-                </h3>
-                <p className="text-gray-600">{resident.age} ans - Chambre {resident.chambre}</p>
-                <div className="flex gap-3 mt-2">
-                  <span className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-sm font-medium">
-                    {resident.gir}
+            <div className="mb-4">
+              <h3 className="text-2xl font-bold text-gray-800">
+                {resident.prenom} {resident.nom}
+              </h3>
+              <p className="text-gray-600">{resident.age} ans - Chambre {resident.chambre}</p>
+              <div className="flex gap-3 mt-2">
+                <span className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-sm font-medium">
+                  {resident.gir}
+                </span>
+                {resident.regimeAlimentaire && (
+                  <span className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-sm font-medium">
+                    🍽️ {resident.regimeAlimentaire}
                   </span>
-                  {resident.regimeAlimentaire && (
-                    <span className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-sm font-medium">
-                      🍽️ {resident.regimeAlimentaire}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setEditingResident(resident)}
-                  className="p-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg"
-                >
-                  <Edit size={18} />
-                </button>
-                <button className="p-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg">
-                  <Trash2 size={18} />
-                </button>
+                )}
               </div>
             </div>
 
