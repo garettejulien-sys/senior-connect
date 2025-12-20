@@ -404,7 +404,10 @@ const App = () => {
     const renderResidenceDashboard = () => (
       <div className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white rounded-xl shadow-md p-6">
+          <div 
+            onClick={() => setActiveResidenceScreen('reclamations')}
+            className="bg-white rounded-xl shadow-md p-6 cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200"
+          >
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-lg font-semibold text-gray-800">Réclamations</h3>
               <AlertCircle className="text-orange-600" size={32} />
@@ -413,7 +416,10 @@ const App = () => {
             <p className="text-sm text-gray-600">En cours de traitement</p>
           </div>
 
-          <div className="bg-white rounded-xl shadow-md p-6">
+          <div 
+            onClick={() => setActiveResidenceScreen('demandes')}
+            className="bg-white rounded-xl shadow-md p-6 cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200"
+          >
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-lg font-semibold text-gray-800">Demandes</h3>
               <Clock className="text-blue-600" size={32} />
@@ -422,7 +428,10 @@ const App = () => {
             <p className="text-sm text-gray-600">En attente de validation</p>
           </div>
 
-          <div className="bg-white rounded-xl shadow-md p-6">
+          <div 
+            onClick={() => setActiveResidenceScreen('animation')}
+            className="bg-white rounded-xl shadow-md p-6 cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200"
+          >
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-lg font-semibold text-gray-800">Événements</h3>
               <Calendar className="text-purple-600" size={32} />
