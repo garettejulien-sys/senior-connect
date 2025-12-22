@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Calendar, FileText, AlertCircle, Camera, User, Home, Plus, Clock, Euro, CheckCircle, XCircle, Edit, Trash2, Save, Users, CalendarDays, Utensils } from 'lucide-react';
+import { Calendar, FileText, AlertCircle, Camera, User, Home, Plus, Clock, Euro, CheckCircle, XCircle, Edit, Trash2, Save, Users, CalendarDays, Utensils, ClipboardList, Star, BarChart3, Archive, Send } from 'lucide-react';
 import { Auth } from './components/Auth';
 import { supabase } from './lib/supabase';
 
@@ -57,6 +57,47 @@ const App = () => {
   const [showAddEvent, setShowAddEvent] = useState(false);
   const [activeFamilyScreen, setActiveFamilyScreen] = useState('dashboard');
   const [activeReclamationTab, setActiveReclamationTab] = useState('en-cours');
+  
+  // États pour les enquêtes de satisfaction
+  const [enquetesView, setEnquetesView] = useState<'liste' | 'creation' | 'resultats' | 'archives'>('liste');
+  const [selectedEnquete, setSelectedEnquete] = useState<any>(null);
+  const [enquetes, setEnquetes] = useState([
+    {
+      id: 1,
+      titre: 'Satisfaction générale - Décembre 2024',
+      description: 'Enquête mensuelle sur la qualité des services',
+      actif: true,
+      archive: false,
+      dateCreation: '01/12/2024',
+      nbReponses: 12,
+      nbTotal: 20,
+      questions: [
+        { id: 1, texte: 'Comment évaluez-vous la qualité des repas ?', type: 'note', obligatoire: true },
+        { id: 2, texte: 'Le personnel est-il à votre écoute ?', type: 'note', obligatoire: true },
+        { id: 3, texte: 'Êtes-vous satisfait des animations proposées ?', type: 'oui_non', obligatoire: true },
+        { id: 4, texte: 'Avez-vous des suggestions d\'amélioration ?', type: 'texte', obligatoire: false }
+      ]
+    }
+  ]);
+  const [enquetesArchivees] = useState([
+    {
+      id: 2,
+      titre: 'Satisfaction générale - Novembre 2024',
+      description: 'Enquête mensuelle',
+      dateCreation: '01/11/2024',
+      dateCloture: '30/11/2024',
+      nbReponses: 18,
+      nbTotal: 20,
+      moyenneGenerale: 4.2
+    }
+  ]);
+  const [nouvelleEnquete, setNouvelleEnquete] = useState({
+    titre: '',
+    description: '',
+    questions: [] as any[]
+  });
+  const [showAddQuestion, setShowAddQuestion] = useState(false);
+  const [nouvelleQuestion, setNouvelleQuestion] = useState({ texte: '', type: 'note', obligatoire: true });
   const [reclamationsArchivees] = useState([
     { id: 3, type: 'Restauration', date: '28/11/2024', dateCloture: '30/11/2024', sujet: 'Menu non adapté', statut: 'Traité' },
     { id: 4, type: 'Ménage', date: '25/11/2024', dateCloture: '26/11/2024', sujet: 'Chambre non nettoyée', statut: 'Traité' }
@@ -2289,6 +2330,397 @@ const App = () => {
       );
     };
 
+    const renderEnquetesSection = () => {
+      // Vue création d'enquête
+      if (enquetesView === 'creation') {
+        return (
+          <div className="space-y-6">
+            <button
+              onClick={() => { setEnquetesView('liste'); setNouvelleEnquete({ titre: '', description: '', questions: [] }); }}
+              className="text-purple-600 hover:text-purple-700 font-semibold flex items-center gap-2"
+            >
+              ← Retour à la liste
+            </button>
+
+            <div className="bg-white rounded-xl shadow-md p-6">
+              <h3 className="text-xl font-semibold text-gray-800 mb-6">Créer une nouvelle enquête</h3>
+              
+              <div className="space-y-4 mb-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Titre de l'enquête</label>
+                  <input
+                    type="text"
+                    value={nouvelleEnquete.titre}
+                    onChange={(e) => setNouvelleEnquete({ ...nouvelleEnquete, titre: e.target.value })}
+                    placeholder="Ex: Satisfaction générale - Janvier 2025"
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Description (optionnel)</label>
+                  <textarea
+                    value={nouvelleEnquete.description}
+                    onChange={(e) => setNouvelleEnquete({ ...nouvelleEnquete, description: e.target.value })}
+                    placeholder="Décrivez l'objectif de cette enquête..."
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2 h-20"
+                  />
+                </div>
+              </div>
+
+              <div className="border-t pt-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h4 className="font-semibold text-gray-800">Questions ({nouvelleEnquete.questions.length})</h4>
+                  <button
+                    onClick={() => setShowAddQuestion(true)}
+                    className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+                  >
+                    <Plus size={18} />
+                    Ajouter une question
+                  </button>
+                </div>
+
+                {showAddQuestion && (
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-4">
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Question</label>
+                        <input
+                          type="text"
+                          value={nouvelleQuestion.texte}
+                          onChange={(e) => setNouvelleQuestion({ ...nouvelleQuestion, texte: e.target.value })}
+                          placeholder="Votre question..."
+                          className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Type de réponse</label>
+                          <select
+                            value={nouvelleQuestion.type}
+                            onChange={(e) => setNouvelleQuestion({ ...nouvelleQuestion, type: e.target.value })}
+                            className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                          >
+                            <option value="note">Note (1 à 5 étoiles)</option>
+                            <option value="oui_non">Oui / Non</option>
+                            <option value="texte">Réponse libre</option>
+                          </select>
+                        </div>
+                        <div className="flex items-end">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={nouvelleQuestion.obligatoire}
+                              onChange={(e) => setNouvelleQuestion({ ...nouvelleQuestion, obligatoire: e.target.checked })}
+                              className="w-4 h-4"
+                            />
+                            <span className="text-sm text-gray-700">Obligatoire</span>
+                          </label>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            if (nouvelleQuestion.texte) {
+                              setNouvelleEnquete({
+                                ...nouvelleEnquete,
+                                questions: [...nouvelleEnquete.questions, { ...nouvelleQuestion, id: Date.now() }]
+                              });
+                              setNouvelleQuestion({ texte: '', type: 'note', obligatoire: true });
+                              setShowAddQuestion(false);
+                            }
+                          }}
+                          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg"
+                        >
+                          Ajouter
+                        </button>
+                        <button
+                          onClick={() => { setShowAddQuestion(false); setNouvelleQuestion({ texte: '', type: 'note', obligatoire: true }); }}
+                          className="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-lg"
+                        >
+                          Annuler
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  {nouvelleEnquete.questions.map((q: any, index: number) => (
+                    <div key={q.id} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <span className="w-6 h-6 bg-purple-600 text-white rounded-full flex items-center justify-center text-sm">
+                          {index + 1}
+                        </span>
+                        <div>
+                          <p className="font-medium text-gray-800">{q.texte}</p>
+                          <p className="text-xs text-gray-500">
+                            {q.type === 'note' && '⭐ Note 1-5'}
+                            {q.type === 'oui_non' && '✅ Oui/Non'}
+                            {q.type === 'texte' && '📝 Texte libre'}
+                            {q.obligatoire && ' • Obligatoire'}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setNouvelleEnquete({
+                          ...nouvelleEnquete,
+                          questions: nouvelleEnquete.questions.filter((_, i) => i !== index)
+                        })}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {nouvelleEnquete.questions.length === 0 && !showAddQuestion && (
+                  <p className="text-center text-gray-500 py-4">Aucune question ajoutée</p>
+                )}
+              </div>
+
+              <div className="border-t pt-6 mt-6 flex gap-3">
+                <button
+                  onClick={() => {
+                    if (nouvelleEnquete.titre && nouvelleEnquete.questions.length > 0) {
+                      setEnquetes([...enquetes, {
+                        id: Date.now(),
+                        ...nouvelleEnquete,
+                        actif: true,
+                        archive: false,
+                        dateCreation: new Date().toLocaleDateString('fr-FR'),
+                        nbReponses: 0,
+                        nbTotal: 20
+                      }]);
+                      setNouvelleEnquete({ titre: '', description: '', questions: [] });
+                      setEnquetesView('liste');
+                    }
+                  }}
+                  disabled={!nouvelleEnquete.titre || nouvelleEnquete.questions.length === 0}
+                  className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2"
+                >
+                  <Send size={18} />
+                  Publier l'enquête
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // Vue résultats d'une enquête
+      if (enquetesView === 'resultats' && selectedEnquete) {
+        const moyennes = [4.2, 3.8, 4.5, 4.0]; // Données simulées
+        return (
+          <div className="space-y-6">
+            <button
+              onClick={() => { setEnquetesView('liste'); setSelectedEnquete(null); }}
+              className="text-purple-600 hover:text-purple-700 font-semibold flex items-center gap-2"
+            >
+              ← Retour à la liste
+            </button>
+
+            <div className="bg-white rounded-xl shadow-md p-6">
+              <div className="flex justify-between items-start mb-6">
+                <div>
+                  <h3 className="text-xl font-semibold text-gray-800">{selectedEnquete.titre}</h3>
+                  <p className="text-gray-600">{selectedEnquete.description}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-2xl font-bold text-purple-600">{selectedEnquete.nbReponses}/{selectedEnquete.nbTotal}</p>
+                  <p className="text-sm text-gray-600">réponses</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div className="bg-purple-50 p-4 rounded-lg text-center">
+                  <p className="text-3xl font-bold text-purple-600">4.1</p>
+                  <p className="text-sm text-gray-600">Moyenne générale</p>
+                </div>
+                <div className="bg-green-50 p-4 rounded-lg text-center">
+                  <p className="text-3xl font-bold text-green-600">85%</p>
+                  <p className="text-sm text-gray-600">Satisfaction</p>
+                </div>
+                <div className="bg-blue-50 p-4 rounded-lg text-center">
+                  <p className="text-3xl font-bold text-blue-600">60%</p>
+                  <p className="text-sm text-gray-600">Taux de réponse</p>
+                </div>
+                <div className="bg-orange-50 p-4 rounded-lg text-center">
+                  <p className="text-3xl font-bold text-orange-600">{selectedEnquete.questions?.length || 4}</p>
+                  <p className="text-sm text-gray-600">Questions</p>
+                </div>
+              </div>
+
+              <h4 className="font-semibold text-gray-800 mb-4">Détail par question</h4>
+              <div className="space-y-4">
+                {(selectedEnquete.questions || []).map((q: any, index: number) => (
+                  <div key={q.id} className="bg-gray-50 p-4 rounded-lg">
+                    <div className="flex justify-between items-start mb-2">
+                      <p className="font-medium text-gray-800">{q.texte}</p>
+                      {q.type === 'note' && (
+                        <div className="flex items-center gap-1">
+                          <span className="text-xl font-bold text-purple-600">{moyennes[index] || 4.0}</span>
+                          <Star className="text-yellow-500 fill-yellow-500" size={20} />
+                        </div>
+                      )}
+                      {q.type === 'oui_non' && (
+                        <span className="text-green-600 font-bold">75% Oui</span>
+                      )}
+                    </div>
+                    {q.type === 'note' && (
+                      <div className="w-full bg-gray-200 rounded-full h-3 mt-2">
+                        <div
+                          className="bg-purple-600 h-3 rounded-full"
+                          style={{ width: `${((moyennes[index] || 4) / 5) * 100}%` }}
+                        ></div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div className="border-t pt-6 mt-6 flex gap-3">
+                <button
+                  onClick={() => {
+                    setEnquetes(enquetes.map(e => 
+                      e.id === selectedEnquete.id ? { ...e, actif: false, archive: true } : e
+                    ));
+                    setEnquetesView('liste');
+                    setSelectedEnquete(null);
+                  }}
+                  className="px-6 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg flex items-center gap-2"
+                >
+                  <Archive size={18} />
+                  Archiver cette enquête
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // Vue archives
+      if (enquetesView === 'archives') {
+        return (
+          <div className="space-y-6">
+            <button
+              onClick={() => setEnquetesView('liste')}
+              className="text-purple-600 hover:text-purple-700 font-semibold flex items-center gap-2"
+            >
+              ← Retour à la liste
+            </button>
+
+            <div className="bg-white rounded-xl shadow-md p-6">
+              <h3 className="text-xl font-semibold text-gray-800 mb-6 flex items-center gap-2">
+                <Archive size={24} />
+                Enquêtes archivées
+              </h3>
+
+              <div className="space-y-4">
+                {enquetesArchivees.map(enquete => (
+                  <div key={enquete.id} className="bg-gray-50 p-4 rounded-lg">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h4 className="font-semibold text-gray-800">{enquete.titre}</h4>
+                        <p className="text-sm text-gray-600">
+                          Du {enquete.dateCreation} au {enquete.dateCloture}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-purple-600">{enquete.moyenneGenerale}/5</p>
+                        <p className="text-sm text-gray-600">{enquete.nbReponses} réponses</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {enquetesArchivees.length === 0 && (
+                  <p className="text-center text-gray-500 py-8">Aucune enquête archivée</p>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // Vue liste (par défaut)
+      return (
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+              <ClipboardList size={28} />
+              Enquêtes de satisfaction
+            </h2>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setEnquetesView('archives')}
+                className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg flex items-center gap-2"
+              >
+                <Archive size={18} />
+                Archives
+              </button>
+              <button
+                onClick={() => setEnquetesView('creation')}
+                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+              >
+                <Plus size={18} />
+                Nouvelle enquête
+              </button>
+            </div>
+          </div>
+
+          {/* Enquêtes actives */}
+          <div className="space-y-4">
+            {enquetes.filter(e => e.actif && !e.archive).map(enquete => (
+              <div key={enquete.id} className="bg-white rounded-xl shadow-md p-6">
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
+                        En cours
+                      </span>
+                    </div>
+                    <h3 className="text-xl font-semibold text-gray-800">{enquete.titre}</h3>
+                    <p className="text-gray-600">{enquete.description}</p>
+                    <p className="text-sm text-gray-500 mt-1">Créée le {enquete.dateCreation}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-3xl font-bold text-purple-600">{enquete.nbReponses}</p>
+                    <p className="text-sm text-gray-600">/ {enquete.nbTotal} réponses</p>
+                  </div>
+                </div>
+
+                <div className="w-full bg-gray-200 rounded-full h-3 mb-4">
+                  <div
+                    className="bg-purple-600 h-3 rounded-full transition-all"
+                    style={{ width: `${(enquete.nbReponses / enquete.nbTotal) * 100}%` }}
+                  ></div>
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => { setSelectedEnquete(enquete); setEnquetesView('resultats'); }}
+                    className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg flex items-center justify-center gap-2"
+                  >
+                    <BarChart3 size={18} />
+                    Voir les résultats
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            {enquetes.filter(e => e.actif && !e.archive).length === 0 && (
+              <div className="bg-white rounded-xl shadow-md p-8 text-center">
+                <ClipboardList size={48} className="mx-auto text-gray-400 mb-4" />
+                <p className="text-gray-600">Aucune enquête en cours</p>
+                <p className="text-sm text-gray-500 mt-2">Créez votre première enquête pour recueillir l'avis des familles</p>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    };
+
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-100">
         <div className="bg-white shadow-md">
@@ -2389,6 +2821,17 @@ const App = () => {
               <User size={18} className="inline mr-2" />
               Résidents
             </button>
+            <button
+              onClick={() => setActiveResidenceScreen('enquetes')}
+              className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
+                activeResidenceScreen === 'enquetes'
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-white text-purple-600 hover:bg-purple-50'
+              }`}
+            >
+              <ClipboardList size={18} className="inline mr-2" />
+              Enquêtes
+            </button>
           </div>
 
           {activeResidenceScreen === 'dashboard' && renderResidenceDashboard()}
@@ -2399,6 +2842,7 @@ const App = () => {
           {activeResidenceScreen === 'personnel' && renderPersonnelSection()}
           {activeResidenceScreen === 'restauration' && renderRestaurationSection()}
           {activeResidenceScreen === 'residents' && renderResidentsSection()}
+          {activeResidenceScreen === 'enquetes' && renderEnquetesSection()}
         </div>
       </div>
     );
@@ -2447,6 +2891,13 @@ const App = () => {
         description="Suivi des intervenants"
         onClick={() => setActiveScreen('tiers')}
         color="pink"
+      />
+      <MenuCard
+        icon={<ClipboardList size={32} />}
+        title="Enquêtes"
+        description="Donnez votre avis"
+        onClick={() => setActiveScreen('enquetes')}
+        color="teal"
       />
     </div>
   );
@@ -3224,6 +3675,165 @@ const App = () => {
     );
   };
 
+  // État pour les réponses aux enquêtes (famille)
+  const [enqueteEnCours, setEnqueteEnCours] = useState<any>(null);
+  const [reponses, setReponses] = useState<{[key: number]: string | number}>({});
+
+  const renderEnquetesFamille = () => {
+    // Si on répond à une enquête
+    if (enqueteEnCours) {
+      return (
+        <div className="space-y-6">
+          <button
+            onClick={() => { setEnqueteEnCours(null); setReponses({}); }}
+            className="text-indigo-600 hover:text-indigo-700 font-semibold flex items-center gap-2"
+          >
+            ← Retour aux enquêtes
+          </button>
+
+          <div className="bg-white rounded-xl shadow-md p-6">
+            <h3 className="text-xl font-semibold text-gray-800 mb-2">{enqueteEnCours.titre}</h3>
+            <p className="text-gray-600 mb-6">{enqueteEnCours.description}</p>
+
+            <div className="space-y-6">
+              {enqueteEnCours.questions.map((question: any, index: number) => (
+                <div key={question.id} className="bg-gray-50 p-4 rounded-lg">
+                  <div className="flex items-start gap-3 mb-3">
+                    <span className="w-6 h-6 bg-indigo-600 text-white rounded-full flex items-center justify-center text-sm flex-shrink-0">
+                      {index + 1}
+                    </span>
+                    <div>
+                      <p className="font-medium text-gray-800">{question.texte}</p>
+                      {question.obligatoire && <span className="text-red-500 text-sm">*Obligatoire</span>}
+                    </div>
+                  </div>
+
+                  {question.type === 'note' && (
+                    <div className="flex gap-2 ml-9">
+                      {[1, 2, 3, 4, 5].map(note => (
+                        <button
+                          key={note}
+                          onClick={() => setReponses({ ...reponses, [question.id]: note })}
+                          className={`w-12 h-12 rounded-lg flex items-center justify-center transition-all ${
+                            reponses[question.id] === note
+                              ? 'bg-yellow-400 text-white scale-110'
+                              : 'bg-white border-2 border-gray-200 hover:border-yellow-400'
+                          }`}
+                        >
+                          <Star size={24} className={reponses[question.id] === note ? 'fill-white' : ''} />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {question.type === 'oui_non' && (
+                    <div className="flex gap-4 ml-9">
+                      <button
+                        onClick={() => setReponses({ ...reponses, [question.id]: 'oui' })}
+                        className={`px-6 py-3 rounded-lg font-semibold transition-all ${
+                          reponses[question.id] === 'oui'
+                            ? 'bg-green-600 text-white'
+                            : 'bg-white border-2 border-gray-200 hover:border-green-400'
+                        }`}
+                      >
+                        ✅ Oui
+                      </button>
+                      <button
+                        onClick={() => setReponses({ ...reponses, [question.id]: 'non' })}
+                        className={`px-6 py-3 rounded-lg font-semibold transition-all ${
+                          reponses[question.id] === 'non'
+                            ? 'bg-red-600 text-white'
+                            : 'bg-white border-2 border-gray-200 hover:border-red-400'
+                        }`}
+                      >
+                        ❌ Non
+                      </button>
+                    </div>
+                  )}
+
+                  {question.type === 'texte' && (
+                    <textarea
+                      value={reponses[question.id] as string || ''}
+                      onChange={(e) => setReponses({ ...reponses, [question.id]: e.target.value })}
+                      placeholder="Votre réponse..."
+                      className="w-full ml-9 border border-gray-300 rounded-lg px-4 py-2 h-24"
+                      style={{ width: 'calc(100% - 2.25rem)' }}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="border-t pt-6 mt-6">
+              <button
+                onClick={() => {
+                  // Simuler l'envoi des réponses
+                  alert('Merci ! Vos réponses ont été envoyées.');
+                  setEnqueteEnCours(null);
+                  setReponses({});
+                }}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2"
+              >
+                <Send size={18} />
+                Envoyer mes réponses
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Liste des enquêtes à répondre
+    return (
+      <div className="space-y-6">
+        <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+          <ClipboardList size={28} />
+          Enquêtes de satisfaction
+        </h2>
+
+        <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 mb-4">
+          <p className="text-indigo-800">
+            📝 Votre avis est précieux ! Répondez aux enquêtes pour aider la résidence à améliorer ses services.
+          </p>
+        </div>
+
+        {/* Enquêtes disponibles */}
+        <div className="space-y-4">
+          {enquetes.filter(e => e.actif && !e.archive).map(enquete => (
+            <div key={enquete.id} className="bg-white rounded-xl shadow-md p-6">
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
+                    À compléter
+                  </span>
+                  <h3 className="text-xl font-semibold text-gray-800 mt-2">{enquete.titre}</h3>
+                  <p className="text-gray-600">{enquete.description}</p>
+                  <p className="text-sm text-gray-500 mt-1">{enquete.questions?.length || 0} questions</p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setEnqueteEnCours(enquete)}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2"
+              >
+                <FileText size={18} />
+                Répondre à l'enquête
+              </button>
+            </div>
+          ))}
+
+          {enquetes.filter(e => e.actif && !e.archive).length === 0 && (
+            <div className="bg-white rounded-xl shadow-md p-8 text-center">
+              <ClipboardList size={48} className="mx-auto text-gray-400 mb-4" />
+              <p className="text-gray-600">Aucune enquête en cours</p>
+              <p className="text-sm text-gray-500 mt-2">Vous serez notifié quand une nouvelle enquête sera disponible</p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="bg-white shadow-md">
@@ -3299,6 +3909,7 @@ const App = () => {
         {activeScreen === 'prestation' && renderPrestation()}
         {activeScreen === 'resident' && renderResident()}
         {activeScreen === 'tiers' && renderTiers()}
+        {activeScreen === 'enquetes' && renderEnquetesFamille()}
       </div>
     </div>
   );
