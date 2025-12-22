@@ -80,6 +80,11 @@ const App = () => {
   });
   const [showAddQuestion, setShowAddQuestion] = useState(false);
   const [nouvelleQuestion, setNouvelleQuestion] = useState({ texte: '', type: 'note', obligatoire: true });
+  
+  // État pour les réponses aux enquêtes (famille)
+  const [enqueteEnCours, setEnqueteEnCours] = useState<any>(null);
+  const [reponses, setReponses] = useState<{[key: number]: string | number}>({});
+  
   const [reclamationsArchivees] = useState([
     { id: 3, type: 'Restauration', date: '28/11/2024', dateCloture: '30/11/2024', sujet: 'Menu non adapté', statut: 'Traité' },
     { id: 4, type: 'Ménage', date: '25/11/2024', dateCloture: '26/11/2024', sujet: 'Chambre non nettoyée', statut: 'Traité' }
@@ -3676,10 +3681,6 @@ const App = () => {
       </div>
     );
   };
-
-  // État pour les réponses aux enquêtes (famille)
-  const [enqueteEnCours, setEnqueteEnCours] = useState<any>(null);
-  const [reponses, setReponses] = useState<{[key: number]: string | number}>({});
 
   const renderEnquetesFamille = () => {
     // Si on répond à une enquête
