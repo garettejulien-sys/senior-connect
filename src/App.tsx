@@ -1,9 +1,34 @@
 import React, { useState } from 'react';
 import { Calendar, FileText, AlertCircle, Camera, User, Home, Plus, Clock, Euro, CheckCircle, XCircle, Edit, Trash2, Save, Users, CalendarDays, Utensils } from 'lucide-react';
+import { Auth } from './components/Auth';
+import { supabase } from './lib/supabase';
 
 const App = () => {
-  const [userType, setUserType] = useState(null);
+  // État d'authentification
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [userType, setUserType] = useState<'residence' | 'famille' | null>(null);
   const [activeScreen, setActiveScreen] = useState('home');
+
+  // Fonction appelée quand l'authentification réussit
+  const handleAuthSuccess = (type: 'residence' | 'famille', userData: any) => {
+    setIsAuthenticated(true);
+    setUserType(type);
+    setCurrentUser(userData);
+  };
+
+  // Fonction de déconnexion
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setIsAuthenticated(false);
+    setUserType(null);
+    setCurrentUser(null);
+  };
+
+  // Si pas authentifié, afficher l'écran de connexion
+  if (!isAuthenticated) {
+    return <Auth onAuthSuccess={handleAuthSuccess} />;
+  }
   const [residents, setResidents] = useState([
     {
       id: 1,
@@ -388,7 +413,7 @@ const App = () => {
               Accès Résidence
             </button>
             <button
-              onClick={() => setUserType('client')}
+              onClick={() => setUserType('famille')}
               className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-4 px-6 rounded-xl transition-colors flex items-center justify-center gap-2"
             >
               <User size={24} />
@@ -2270,7 +2295,7 @@ const App = () => {
           <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
             <h1 className="text-2xl font-bold text-purple-900">SeniorConnect - Espace Résidence</h1>
             <button
-              onClick={() => setUserType(null)}
+              onClick={handleLogout}
               className="text-purple-600 hover:text-purple-700 font-semibold"
             >
               Déconnexion
@@ -3205,7 +3230,7 @@ const App = () => {
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
           <h1 className="text-2xl font-bold text-indigo-900">SeniorConnect - Espace Famille</h1>
           <button
-            onClick={() => setUserType(null)}
+            onClick={handleLogout}
             className="text-indigo-600 hover:text-indigo-700 font-semibold"
           >
             Déconnexion
