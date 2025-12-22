@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { supabase, generateCodeResidence, generateCodeResident, Residence } from '../lib/supabase';
+import { supabase, generateCodeResidence, generateCodeResident } from '../lib/supabase';
+import type { Residence } from '../lib/supabase';
 import { Home, Users, Mail, Lock, Building, Phone, MapPin, FileText, ArrowLeft, CheckCircle, AlertCircle } from 'lucide-react';
 
 interface AuthProps {
