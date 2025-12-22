@@ -10,25 +10,7 @@ const App = () => {
   const [userType, setUserType] = useState<'residence' | 'famille' | null>(null);
   const [activeScreen, setActiveScreen] = useState('home');
 
-  // Fonction appelée quand l'authentification réussit
-  const handleAuthSuccess = (type: 'residence' | 'famille', userData: any) => {
-    setIsAuthenticated(true);
-    setUserType(type);
-    setCurrentUser(userData);
-  };
-
-  // Fonction de déconnexion
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    setIsAuthenticated(false);
-    setUserType(null);
-    setCurrentUser(null);
-  };
-
-  // Si pas authentifié, afficher l'écran de connexion
-  if (!isAuthenticated) {
-    return <Auth onAuthSuccess={handleAuthSuccess} />;
-  }
+  // TOUS LES HOOKS DOIVENT ÊTRE ICI, AVANT TOUT RETURN CONDITIONNEL
   const [residents, setResidents] = useState([
     {
       id: 1,
@@ -434,6 +416,26 @@ const App = () => {
       ]
     }
   });
+
+  // Fonction appelée quand l'authentification réussit
+  const handleAuthSuccess = (type: 'residence' | 'famille', userData: any) => {
+    setIsAuthenticated(true);
+    setUserType(type);
+    setCurrentUser(userData);
+  };
+
+  // Fonction de déconnexion
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setIsAuthenticated(false);
+    setUserType(null);
+    setCurrentUser(null);
+  };
+
+  // Si pas authentifié, afficher l'écran de connexion
+  if (!isAuthenticated) {
+    return <Auth onAuthSuccess={handleAuthSuccess} />;
+  }
 
   if (!userType) {
     return (
