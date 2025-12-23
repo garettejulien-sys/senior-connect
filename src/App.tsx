@@ -1,7 +1,37 @@
-import React, { useState } from 'react';
-import { Calendar, FileText, AlertCircle, Camera, User, Home, Plus, Clock, Euro, CheckCircle, XCircle, Edit, Trash2, Save, Users, CalendarDays, Utensils, ClipboardList, Star, BarChart3, Archive, Send } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Calendar, FileText, AlertCircle, Camera, User, Home, Plus, Clock, Euro, CheckCircle, XCircle, Edit, Trash2, Save, Users, CalendarDays, Utensils, ClipboardList, Star, BarChart3, Archive, Send, RefreshCw } from 'lucide-react';
 import { Auth } from './components/Auth';
-import { supabase } from './lib/supabase';
+import { 
+  supabase,
+  type Demande,
+  type Reclamation,
+  type Animation,
+  type Enquete,
+  type CahierLiaison,
+  type Resident,
+  creerDemande,
+  getDemandesResidence,
+  getDemandesResident,
+  updateStatutDemande,
+  creerReclamation,
+  getReclamationsResidence,
+  getReclamationsResident,
+  traiterReclamation,
+  creerAnimation,
+  getAnimationsResidence,
+  inscrireAnimation,
+  getEnquetesActives,
+  creerEnquete,
+  soumettreReponsesEnquete,
+  aDejaRepondu,
+  ajouterEntreeCahier,
+  getCahierLiaison,
+  getResidentsResidence,
+  creerResident,
+  updateResident,
+  supprimerResident,
+  generateCodeResident
+} from './lib/supabase';
 
 const App = () => {
   // État d'authentification
@@ -11,26 +41,16 @@ const App = () => {
   const [activeScreen, setActiveScreen] = useState('home');
 
   // TOUS LES HOOKS DOIVENT ÊTRE ICI, AVANT TOUT RETURN CONDITIONNEL
-  const [residents, setResidents] = useState([
-    {
-      id: 1,
-      nom: 'Dupont',
-      prenom: 'Marie',
-      age: 78,
-      chambre: '205',
-      gir: 'GIR 3',
-      regimeAlimentaire: 'Sans sel',
-      medecin: { nom: 'Dr. Martin', tel: '01 23 45 67 89' },
-      proche: { nom: 'Jean Dupont', tel: '06 12 34 56 78' },
-      besoins: 'Difficulté à marcher seule'
-    }
-  ]);
+  const [residents, setResidents] = useState<any[]>([]);
   const [selectedResident, setSelectedResident] = useState(null);
-  const [demandesEnAttente, setDemandesEnAttente] = useState([
-    { id: 1, type: 'Repas', resident: 'Marie Dupont', date: '18/12/2024', heure: '12h00', details: 'Au restaurant avec 4 accompagnants', statut: 'En attente' },
-    { id: 2, type: 'Maintenance', resident: 'Marie Dupont', date: '16/12/2024', details: 'Problème électricité - Prise chambre 205', statut: 'En attente' },
-    { id: 3, type: 'Ménage', resident: 'Marie Dupont', date: '19/12/2024', heure: '10h00', statut: 'En attente' }
-  ]);
+  const [demandesEnAttente, setDemandesEnAttente] = useState<Demande[]>([]);
+  const [toutesLesDemandes, setToutesLesDemandes] = useState<Demande[]>([]);
+  const [reclamationsData, setReclamationsData] = useState<Reclamation[]>([]);
+  const [animationsData, setAnimationsData] = useState<Animation[]>([]);
+  const [enquetesData, setEnquetesData] = useState<Enquete[]>([]);
+  const [cahierLiaisonData, setCahierLiaisonData] = useState<CahierLiaison[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('');
   const [activeResidenceScreen, setActiveResidenceScreen] = useState('dashboard');
   const [showAnimationPhotos, setShowAnimationPhotos] = useState(false);
   const [showAnimationPlanning, setShowAnimationPlanning] = useState(false);
@@ -43,24 +63,7 @@ const App = () => {
   // États pour les enquêtes de satisfaction
   const [enquetesView, setEnquetesView] = useState<'liste' | 'creation' | 'resultats' | 'archives'>('liste');
   const [selectedEnquete, setSelectedEnquete] = useState<any>(null);
-  const [enquetes, setEnquetes] = useState([
-    {
-      id: 1,
-      titre: 'Satisfaction générale - Décembre 2024',
-      description: 'Enquête mensuelle sur la qualité des services',
-      actif: true,
-      archive: false,
-      dateCreation: '01/12/2024',
-      nbReponses: 12,
-      nbTotal: 20,
-      questions: [
-        { id: 1, texte: 'Comment évaluez-vous la qualité des repas ?', type: 'note', obligatoire: true },
-        { id: 2, texte: 'Le personnel est-il à votre écoute ?', type: 'note', obligatoire: true },
-        { id: 3, texte: 'Êtes-vous satisfait des animations proposées ?', type: 'oui_non', obligatoire: true },
-        { id: 4, texte: 'Avez-vous des suggestions d\'amélioration ?', type: 'texte', obligatoire: false }
-      ]
-    }
-  ]);
+  const [enquetes, setEnquetes] = useState<any[]>([]);
   const [enquetesArchivees] = useState([
     {
       id: 2,
@@ -91,25 +94,12 @@ const App = () => {
   ]);
   const [showDemandesGestion, setShowDemandesGestion] = useState(false);
   const [activeDemandeType, setActiveDemandeType] = useState(null);
-  const [demandesMenage] = useState([
-    { id: 1, resident: 'Marie Dupont', chambre: '205', date: '19/12/2024', heure: '10h00', statut: 'En attente' },
-    { id: 2, resident: 'Jean Martin', chambre: '310', date: '20/12/2024', heure: '14h00', statut: 'En attente' }
-  ]);
-  const [demandesToilette] = useState([
-    { id: 1, resident: 'Marie Dupont', chambre: '205', date: '18/12/2024', heure: '08h00', statut: 'En attente' },
-    { id: 2, resident: 'Pierre Durand', chambre: '412', date: '19/12/2024', heure: '09h00', statut: 'En attente' }
-  ]);
-  const [demandesCourses, setDemandesCourses] = useState([
-    { id: 1, resident: 'Marie Dupont', chambre: '205', date: '18/12/2024', dateLivraison: '20/12/2024', liste: 'Pain, lait, fruits, fromage', statut: 'En attente' },
-    { id: 2, resident: 'Jean Martin', chambre: '310', date: '17/12/2024', dateLivraison: '19/12/2024', liste: 'Journaux, chocolat, café', statut: 'En cours' },
-    { id: 3, resident: 'Pierre Durand', chambre: '412', date: '16/12/2024', dateLivraison: '18/12/2024', liste: 'Savon, shampoing, mouchoirs', statut: 'Réalisé' }
-  ]);
-  const [demandesMaintenance, setDemandesMaintenance] = useState([
-    { id: 1, resident: 'Marie Dupont', chambre: '205', date: '15/12/2024', objet: 'Prise électrique défectueuse', statut: 'En cours' },
-    { id: 2, resident: 'Jean Martin', chambre: '310', date: '14/12/2024', objet: 'Fuite robinet salle de bain', statut: 'À faire' },
-    { id: 3, resident: 'Suzanne Leroy', chambre: '108', date: '13/12/2024', objet: 'Volet roulant bloqué', statut: 'Fait' },
-    { id: 4, resident: 'Pierre Durand', chambre: '412', date: '17/12/2024', objet: 'Chauffage insuffisant', statut: 'À faire' }
-  ]);
+  
+  // Demandes filtrées par type (données dynamiques depuis Supabase)
+  const demandesMenage = toutesLesDemandes.filter(d => d.type === 'menage');
+  const demandesToilette = toutesLesDemandes.filter(d => d.type === 'toilette');
+  const demandesCourses = toutesLesDemandes.filter(d => d.type === 'courses');
+  const demandesMaintenance = toutesLesDemandes.filter(d => d.type === 'maintenance');
   const [maintenanceTab, setMaintenanceTab] = useState('en-cours'); // 'en-cours' ou 'archives'
   const [showProposeNewSlot, setShowProposeNewSlot] = useState(false);
   const [selectedDemande, setSelectedDemande] = useState(null);
@@ -165,15 +155,12 @@ const App = () => {
       { type: 'Repas accompagnants (4 personnes)', montant: 120 }
     ]}
   ]);
-  const [reclamations, setReclamations] = useState([
-    { id: 1, date: '10/12/2024', sujet: 'Problème de chauffage', statut: 'En cours' },
-    { id: 2, date: '05/12/2024', sujet: 'Qualité du repas', statut: 'Traité' }
-  ]);
-  const [evenements, setEvenemements] = useState([
-    { id: 1, titre: 'Concert de piano', date: '20/12/2024', heure: '15h00', inscrits: [] },
-    { id: 2, titre: 'Atelier peinture', date: '22/12/2024', heure: '14h30', inscrits: [] }
-  ]);
+  const [reclamations, setReclamations] = useState<any[]>([]);
+  const [evenements, setEvenemements] = useState<any[]>([]);
   const [showNewReclamation, setShowNewReclamation] = useState(false);
+  const [reclamationSujet, setReclamationSujet] = useState('');
+  const [reclamationDescription, setReclamationDescription] = useState('');
+  const [reclamationSuccessMessage, setReclamationSuccessMessage] = useState('');
   const [showNewPrestation, setShowNewPrestation] = useState(false);
   const [prestationType, setPrestationType] = useState(null);
   const [editingResident, setEditingResident] = useState(null);
@@ -197,10 +184,7 @@ const App = () => {
   ]);
   const [showReservationTiers, setShowReservationTiers] = useState(false);
   const [showPlanningTiers, setShowPlanningTiers] = useState(false);
-  const [planningTiersEntries, setPlanningTiersEntries] = useState([
-    { id: 1, date: '16/12/2024', heure: '14h00-15h00', tiers: 'Infirmier', commentaire: 'Monsieur a bien mangé et a pris ses cachets' },
-    { id: 2, date: '17/12/2024', heure: '10h00-11h00', tiers: 'Kinésithérapeute', commentaire: 'Séance réalisée, bonne mobilité' }
-  ]);
+  const [planningTiersEntries, setPlanningTiersEntries] = useState<any[]>([]);
 
   // État pour le personnel
   const [personnel, setPersonnel] = useState([
@@ -214,8 +198,8 @@ const App = () => {
 
   // État pour le planning avancé
   const [planningViewMode, setPlanningViewMode] = useState('resident'); // 'resident', 'personnel', 'both'
-  const [selectedResidentPlanning, setSelectedResidentPlanning] = useState(null);
-  const [selectedPersonnelPlanning, setSelectedPersonnelPlanning] = useState(null);
+  const [selectedResidentPlanning, setSelectedResidentPlanning] = useState<string | null>(null);
+  const [selectedPersonnelPlanning, setSelectedPersonnelPlanning] = useState<number | null>(null);
 
   // État pour la restauration
   const [restaurationView, setRestaurationView] = useState('inscriptions'); // 'inscriptions', 'regimes'
@@ -372,55 +356,53 @@ const App = () => {
     }
   });
 
-  // Planning détaillé des résidents
-  const [planningResidents] = useState({
-    1: { // Marie Dupont
-      Lundi: [
-        { heure: '07:00', activite: 'Réveil / Toilette', fin: '08:00', type: 'soin' },
-        { heure: '08:00', activite: 'Petit-déjeuner', fin: '09:00', type: 'repas' },
-        { heure: '10:00', activite: 'Atelier mémoire', fin: '11:00', type: 'animation' },
-        { heure: '12:00', activite: 'Déjeuner', fin: '13:00', type: 'repas' },
-        { heure: '14:30', activite: 'Lecture', fin: '15:30', type: 'animation' },
-        { heure: '19:00', activite: 'Dîner', fin: '20:00', type: 'repas' },
-        { heure: '21:00', activite: 'Coucher', fin: '21:30', type: 'soin' }
-      ],
-      Mardi: [
-        { heure: '07:00', activite: 'Réveil / Toilette', fin: '08:00', type: 'soin' },
-        { heure: '08:00', activite: 'Petit-déjeuner', fin: '09:00', type: 'repas' },
-        { heure: '10:30', activite: 'Gymnastique douce', fin: '11:30', type: 'animation' },
-        { heure: '12:00', activite: 'Déjeuner', fin: '13:00', type: 'repas' },
-        { heure: '15:00', activite: 'Visite famille', fin: '17:00', type: 'visite' },
-        { heure: '19:00', activite: 'Dîner', fin: '20:00', type: 'repas' },
-        { heure: '21:00', activite: 'Coucher', fin: '21:30', type: 'soin' }
-      ],
-      Mercredi: [
-        { heure: '07:00', activite: 'Réveil / Toilette', fin: '08:00', type: 'soin' },
-        { heure: '08:00', activite: 'Petit-déjeuner', fin: '09:00', type: 'repas' },
-        { heure: '10:00', activite: 'Kiné', fin: '11:00', type: 'soin' },
-        { heure: '12:00', activite: 'Déjeuner', fin: '13:00', type: 'repas' },
-        { heure: '15:00', activite: 'Jeux de société', fin: '16:30', type: 'animation' },
-        { heure: '19:00', activite: 'Dîner', fin: '20:00', type: 'repas' },
-        { heure: '21:00', activite: 'Coucher', fin: '21:30', type: 'soin' }
-      ],
-      Jeudi: [
-        { heure: '07:00', activite: 'Réveil / Toilette', fin: '08:00', type: 'soin' },
-        { heure: '08:00', activite: 'Petit-déjeuner', fin: '09:00', type: 'repas' },
-        { heure: '10:00', activite: 'Atelier peinture', fin: '11:30', type: 'animation' },
-        { heure: '12:00', activite: 'Déjeuner', fin: '13:00', type: 'repas' },
-        { heure: '14:00', activite: 'Coiffeur', fin: '15:00', type: 'service' },
-        { heure: '19:00', activite: 'Dîner', fin: '20:00', type: 'repas' },
-        { heure: '21:00', activite: 'Coucher', fin: '21:30', type: 'soin' }
-      ],
-      Vendredi: [
-        { heure: '07:00', activite: 'Réveil / Toilette', fin: '08:00', type: 'soin' },
-        { heure: '08:00', activite: 'Petit-déjeuner', fin: '09:00', type: 'repas' },
-        { heure: '12:00', activite: 'Déjeuner', fin: '13:00', type: 'repas' },
-        { heure: '15:00', activite: 'Concert de piano', fin: '16:30', type: 'animation' },
-        { heure: '19:00', activite: 'Dîner', fin: '20:00', type: 'repas' },
-        { heure: '21:00', activite: 'Coucher', fin: '21:30', type: 'soin' }
-      ]
-    }
-  });
+  // Planning type par défaut pour les résidents
+  const planningResidentDefault = {
+    Lundi: [
+      { heure: '07:00', activite: 'Réveil / Toilette', fin: '08:00', type: 'soin' },
+      { heure: '08:00', activite: 'Petit-déjeuner', fin: '09:00', type: 'repas' },
+      { heure: '10:00', activite: 'Atelier mémoire', fin: '11:00', type: 'animation' },
+      { heure: '12:00', activite: 'Déjeuner', fin: '13:00', type: 'repas' },
+      { heure: '14:30', activite: 'Lecture', fin: '15:30', type: 'animation' },
+      { heure: '19:00', activite: 'Dîner', fin: '20:00', type: 'repas' },
+      { heure: '21:00', activite: 'Coucher', fin: '21:30', type: 'soin' }
+    ],
+    Mardi: [
+      { heure: '07:00', activite: 'Réveil / Toilette', fin: '08:00', type: 'soin' },
+      { heure: '08:00', activite: 'Petit-déjeuner', fin: '09:00', type: 'repas' },
+      { heure: '10:30', activite: 'Gymnastique douce', fin: '11:30', type: 'animation' },
+      { heure: '12:00', activite: 'Déjeuner', fin: '13:00', type: 'repas' },
+      { heure: '15:00', activite: 'Visite famille', fin: '17:00', type: 'visite' },
+      { heure: '19:00', activite: 'Dîner', fin: '20:00', type: 'repas' },
+      { heure: '21:00', activite: 'Coucher', fin: '21:30', type: 'soin' }
+    ],
+    Mercredi: [
+      { heure: '07:00', activite: 'Réveil / Toilette', fin: '08:00', type: 'soin' },
+      { heure: '08:00', activite: 'Petit-déjeuner', fin: '09:00', type: 'repas' },
+      { heure: '10:00', activite: 'Kiné', fin: '11:00', type: 'soin' },
+      { heure: '12:00', activite: 'Déjeuner', fin: '13:00', type: 'repas' },
+      { heure: '15:00', activite: 'Jeux de société', fin: '16:30', type: 'animation' },
+      { heure: '19:00', activite: 'Dîner', fin: '20:00', type: 'repas' },
+      { heure: '21:00', activite: 'Coucher', fin: '21:30', type: 'soin' }
+    ],
+    Jeudi: [
+      { heure: '07:00', activite: 'Réveil / Toilette', fin: '08:00', type: 'soin' },
+      { heure: '08:00', activite: 'Petit-déjeuner', fin: '09:00', type: 'repas' },
+      { heure: '10:00', activite: 'Atelier peinture', fin: '11:30', type: 'animation' },
+      { heure: '12:00', activite: 'Déjeuner', fin: '13:00', type: 'repas' },
+      { heure: '14:00', activite: 'Coiffeur', fin: '15:00', type: 'service' },
+      { heure: '19:00', activite: 'Dîner', fin: '20:00', type: 'repas' },
+      { heure: '21:00', activite: 'Coucher', fin: '21:30', type: 'soin' }
+    ],
+    Vendredi: [
+      { heure: '07:00', activite: 'Réveil / Toilette', fin: '08:00', type: 'soin' },
+      { heure: '08:00', activite: 'Petit-déjeuner', fin: '09:00', type: 'repas' },
+      { heure: '12:00', activite: 'Déjeuner', fin: '13:00', type: 'repas' },
+      { heure: '15:00', activite: 'Concert de piano', fin: '16:30', type: 'animation' },
+      { heure: '19:00', activite: 'Dîner', fin: '20:00', type: 'repas' },
+      { heure: '21:00', activite: 'Coucher', fin: '21:30', type: 'soin' }
+    ]
+  };
 
   // Fonction appelée quand l'authentification réussit
   const handleAuthSuccess = (type: 'residence' | 'famille', userData: any) => {
@@ -435,6 +417,439 @@ const App = () => {
     setIsAuthenticated(false);
     setUserType(null);
     setCurrentUser(null);
+  };
+
+  // ================================================
+  // FONCTIONS DE CHARGEMENT DES DONNÉES
+  // ================================================
+
+  // Charger les résidents de la résidence
+  const loadResidents = useCallback(async () => {
+    if (!currentUser) return;
+    const residenceId = userType === 'residence' ? currentUser.id : currentUser.residence?.id;
+    if (!residenceId) return;
+    
+    const { data, error } = await getResidentsResidence(residenceId);
+    if (data && !error) {
+      // Transformer les données pour correspondre au format attendu
+      const formattedResidents = data.map((r: any) => ({
+        id: r.id,
+        nom: r.nom,
+        prenom: r.prenom,
+        age: r.age,
+        chambre: r.chambre,
+        gir: r.gir,
+        regimeAlimentaire: r.regime_alimentaire,
+        medecin: { nom: r.medecin_nom || '', tel: r.medecin_tel || '' },
+        proche: { nom: r.proche_nom || '', tel: r.proche_tel || '' },
+        besoins: r.besoins,
+        code_famille: r.code_famille
+      }));
+      setResidents(formattedResidents);
+    }
+  }, [currentUser, userType]);
+
+  // Charger les demandes
+  const loadDemandes = useCallback(async () => {
+    if (!currentUser) return;
+    
+    let data, error;
+    if (userType === 'residence') {
+      const result = await getDemandesResidence(currentUser.id);
+      data = result.data;
+      error = result.error;
+    } else if (currentUser.resident) {
+      const result = await getDemandesResident(currentUser.resident.id);
+      data = result.data;
+      error = result.error;
+    }
+    
+    if (data && !error) {
+      setToutesLesDemandes(data);
+      setDemandesEnAttente(data.filter((d: Demande) => d.statut === 'en_attente'));
+    }
+  }, [currentUser, userType]);
+
+  // Charger les réclamations
+  const loadReclamations = useCallback(async () => {
+    if (!currentUser) return;
+    
+    let data, error;
+    if (userType === 'residence') {
+      const result = await getReclamationsResidence(currentUser.id);
+      data = result.data;
+      error = result.error;
+    } else if (currentUser.resident) {
+      const result = await getReclamationsResident(currentUser.resident.id);
+      data = result.data;
+      error = result.error;
+    }
+    
+    if (data && !error) {
+      setReclamationsData(data);
+      // Mise à jour de l'ancien format pour compatibilité
+      setReclamations(data.map((r: Reclamation) => ({
+        id: r.id,
+        date: new Date(r.created_at).toLocaleDateString('fr-FR'),
+        sujet: r.sujet,
+        description: r.description,
+        statut: r.statut === 'en_cours' ? 'En cours' : 'Traité'
+      })));
+    }
+  }, [currentUser, userType]);
+
+  // Charger les animations/événements
+  const loadAnimations = useCallback(async () => {
+    if (!currentUser) return;
+    const residenceId = userType === 'residence' ? currentUser.id : currentUser.residence?.id;
+    if (!residenceId) return;
+    
+    const { data, error } = await getAnimationsResidence(residenceId);
+    if (data && !error) {
+      setAnimationsData(data);
+      // Mise à jour de l'ancien format pour compatibilité
+      setEvenemements(data.map((a: Animation) => ({
+        id: a.id,
+        titre: a.titre,
+        date: new Date(a.date).toLocaleDateString('fr-FR'),
+        heure: a.heure,
+        inscrits: a.inscriptions_animations || []
+      })));
+    }
+  }, [currentUser, userType]);
+
+  // Charger les enquêtes
+  const loadEnquetes = useCallback(async () => {
+    if (!currentUser) return;
+    const residenceId = userType === 'residence' ? currentUser.id : currentUser.residence?.id;
+    if (!residenceId) return;
+    
+    const { data, error } = await getEnquetesActives(residenceId);
+    if (data && !error) {
+      setEnquetesData(data);
+      // Mise à jour de l'ancien format pour compatibilité
+      setEnquetes(data.map((e: Enquete) => ({
+        id: e.id,
+        titre: e.titre,
+        description: e.description,
+        actif: e.actif,
+        archive: e.archive,
+        dateCreation: new Date(e.created_at).toLocaleDateString('fr-FR'),
+        nbReponses: 0,
+        nbTotal: 0,
+        questions: e.questions_enquete || []
+      })));
+    }
+  }, [currentUser, userType]);
+
+  // Charger le cahier de liaison
+  const loadCahierLiaison = useCallback(async () => {
+    if (!currentUser || !currentUser.resident) return;
+    
+    const { data, error } = await getCahierLiaison(currentUser.resident.id);
+    if (data && !error) {
+      setCahierLiaisonData(data);
+      setPlanningTiersEntries(data.map((c: CahierLiaison) => ({
+        id: c.id,
+        date: new Date(c.date).toLocaleDateString('fr-FR'),
+        heure: c.heure || '',
+        tiers: c.type_intervenant,
+        commentaire: c.commentaire || ''
+      })));
+    }
+  }, [currentUser]);
+
+  // Charger toutes les données au démarrage
+  const loadAllData = useCallback(async () => {
+    if (!currentUser) return;
+    setIsLoading(true);
+    setLoadingMessage('Chargement des données...');
+    
+    await Promise.all([
+      loadResidents(),
+      loadDemandes(),
+      loadReclamations(),
+      loadAnimations(),
+      loadEnquetes(),
+      loadCahierLiaison()
+    ]);
+    
+    setIsLoading(false);
+    setLoadingMessage('');
+  }, [loadResidents, loadDemandes, loadReclamations, loadAnimations, loadEnquetes, loadCahierLiaison, currentUser]);
+
+  // Effet pour charger les données au changement d'utilisateur
+  useEffect(() => {
+    if (isAuthenticated && currentUser) {
+      loadAllData();
+    }
+  }, [isAuthenticated, currentUser, loadAllData]);
+
+  // ================================================
+  // FONCTIONS D'ACTIONS (CRÉER, MODIFIER, SUPPRIMER)
+  // ================================================
+
+  // Créer une nouvelle demande (famille)
+  const handleCreerDemande = async (type: string, sousType?: string, dateSouhaitee?: string, heure?: string, details?: string) => {
+    if (!currentUser?.resident) return { success: false, error: 'Non connecté' };
+    
+    setIsLoading(true);
+    setLoadingMessage('Envoi de la demande...');
+    
+    const { data, error } = await creerDemande({
+      residence_id: currentUser.residence.id,
+      resident_id: currentUser.resident.id,
+      type: type as any,
+      sous_type: sousType,
+      date_demande: new Date().toISOString().split('T')[0],
+      date_souhaitee: dateSouhaitee,
+      heure,
+      details
+    });
+    
+    setIsLoading(false);
+    
+    if (!error && data) {
+      await loadDemandes();
+      return { success: true, data };
+    }
+    return { success: false, error: error?.message };
+  };
+
+  // Valider ou refuser une demande (résidence)
+  const handleValiderDemande = async (demandeId: string, statut: 'validee' | 'refusee' | 'en_cours' | 'terminee', reponse?: string) => {
+    setIsLoading(true);
+    setLoadingMessage('Mise à jour...');
+    
+    const { error } = await updateStatutDemande(demandeId, statut, reponse);
+    
+    setIsLoading(false);
+    
+    if (!error) {
+      await loadDemandes();
+      return { success: true };
+    }
+    return { success: false, error: error?.message };
+  };
+
+  // Créer une réclamation (famille)
+  const handleCreerReclamation = async (sujet: string, description: string) => {
+    if (!currentUser?.resident) return { success: false, error: 'Non connecté' };
+    
+    setIsLoading(true);
+    setLoadingMessage('Envoi de la réclamation...');
+    
+    const { data, error } = await creerReclamation({
+      residence_id: currentUser.residence.id,
+      resident_id: currentUser.resident.id,
+      sujet: sujet as any,
+      description
+    });
+    
+    setIsLoading(false);
+    
+    if (!error && data) {
+      await loadReclamations();
+      return { success: true, data };
+    }
+    return { success: false, error: error?.message };
+  };
+
+  // Traiter une réclamation (résidence)
+  const handleTraiterReclamation = async (reclamationId: string, reponse?: string) => {
+    setIsLoading(true);
+    setLoadingMessage('Traitement...');
+    
+    const { error } = await traiterReclamation(reclamationId, reponse);
+    
+    setIsLoading(false);
+    
+    if (!error) {
+      await loadReclamations();
+      return { success: true };
+    }
+    return { success: false, error: error?.message };
+  };
+
+  // Créer une animation (résidence)
+  const handleCreerAnimation = async (titre: string, description: string, date: string, heure: string, lieu?: string, placesMax?: number) => {
+    if (!currentUser || userType !== 'residence') return { success: false, error: 'Non autorisé' };
+    
+    setIsLoading(true);
+    setLoadingMessage('Création de l\'événement...');
+    
+    const { data, error } = await creerAnimation({
+      residence_id: currentUser.id,
+      titre,
+      description,
+      date,
+      heure,
+      lieu,
+      places_max: placesMax,
+      actif: true
+    });
+    
+    setIsLoading(false);
+    
+    if (!error && data) {
+      await loadAnimations();
+      return { success: true, data };
+    }
+    return { success: false, error: error?.message };
+  };
+
+  // Inscrire à une animation (famille)
+  const handleInscrireAnimation = async (animationId: string) => {
+    if (!currentUser?.resident) return { success: false, error: 'Non connecté' };
+    
+    setIsLoading(true);
+    setLoadingMessage('Inscription...');
+    
+    const { error } = await inscrireAnimation(animationId, currentUser.resident.id, 'famille');
+    
+    setIsLoading(false);
+    
+    if (!error) {
+      await loadAnimations();
+      return { success: true };
+    }
+    return { success: false, error: error?.message };
+  };
+
+  // Soumettre les réponses à une enquête (famille)
+  const handleSoumettreEnquete = async (enqueteId: string, reponsesMap: {[questionId: string]: string | number}) => {
+    if (!currentUser?.resident) return { success: false, error: 'Non connecté' };
+    
+    setIsLoading(true);
+    setLoadingMessage('Envoi des réponses...');
+    
+    const reponsesArray = Object.entries(reponsesMap).map(([questionId, valeur]) => ({
+      enquete_id: enqueteId,
+      question_id: questionId,
+      resident_id: currentUser.resident.id,
+      reponse: typeof valeur === 'string' ? valeur : undefined,
+      note: typeof valeur === 'number' ? valeur : undefined
+    }));
+    
+    const { error } = await soumettreReponsesEnquete(reponsesArray);
+    
+    setIsLoading(false);
+    
+    if (!error) {
+      await loadEnquetes();
+      return { success: true };
+    }
+    return { success: false, error: error?.message };
+  };
+
+  // Ajouter une entrée au cahier de liaison
+  const handleAjouterCahierLiaison = async (typeIntervenant: string, date: string, heure: string, commentaire: string) => {
+    if (!currentUser) return { success: false, error: 'Non connecté' };
+    
+    const residentId = userType === 'famille' ? currentUser.resident?.id : null;
+    const residenceId = userType === 'residence' ? currentUser.id : currentUser.residence?.id;
+    
+    if (!residentId || !residenceId) return { success: false, error: 'Données manquantes' };
+    
+    setIsLoading(true);
+    setLoadingMessage('Ajout au cahier...');
+    
+    const { data, error } = await ajouterEntreeCahier({
+      residence_id: residenceId,
+      resident_id: residentId,
+      type_intervenant: typeIntervenant,
+      date,
+      heure,
+      commentaire,
+      auteur: userType as 'famille' | 'residence'
+    });
+    
+    setIsLoading(false);
+    
+    if (!error && data) {
+      await loadCahierLiaison();
+      return { success: true, data };
+    }
+    return { success: false, error: error?.message };
+  };
+
+  // Créer un nouveau résident (résidence)
+  const handleCreerResident = async (residentData: any) => {
+    if (!currentUser || userType !== 'residence') return { success: false, error: 'Non autorisé' };
+    
+    setIsLoading(true);
+    setLoadingMessage('Création du résident...');
+    
+    const { data, error } = await creerResident({
+      residence_id: currentUser.id,
+      nom: residentData.nom,
+      prenom: residentData.prenom,
+      age: residentData.age,
+      chambre: residentData.chambre,
+      gir: residentData.gir,
+      regime_alimentaire: residentData.regimeAlimentaire,
+      medecin_nom: residentData.medecin?.nom,
+      medecin_tel: residentData.medecin?.tel,
+      proche_nom: residentData.proche?.nom,
+      proche_tel: residentData.proche?.tel,
+      besoins: residentData.besoins
+    });
+    
+    setIsLoading(false);
+    
+    if (!error && data) {
+      await loadResidents();
+      return { success: true, data };
+    }
+    return { success: false, error: error?.message };
+  };
+
+  // Mettre à jour un résident (résidence)
+  const handleUpdateResident = async (residentId: string, updates: any) => {
+    if (!currentUser || userType !== 'residence') return { success: false, error: 'Non autorisé' };
+    
+    setIsLoading(true);
+    setLoadingMessage('Mise à jour...');
+    
+    const { data, error } = await updateResident(residentId, {
+      nom: updates.nom,
+      prenom: updates.prenom,
+      age: updates.age,
+      chambre: updates.chambre,
+      gir: updates.gir,
+      regime_alimentaire: updates.regimeAlimentaire,
+      medecin_nom: updates.medecin?.nom,
+      medecin_tel: updates.medecin?.tel,
+      proche_nom: updates.proche?.nom,
+      proche_tel: updates.proche?.tel,
+      besoins: updates.besoins
+    });
+    
+    setIsLoading(false);
+    
+    if (!error && data) {
+      await loadResidents();
+      return { success: true, data };
+    }
+    return { success: false, error: error?.message };
+  };
+
+  // Supprimer un résident (résidence)
+  const handleSupprimerResident = async (residentId: string) => {
+    if (!currentUser || userType !== 'residence') return { success: false, error: 'Non autorisé' };
+    
+    setIsLoading(true);
+    setLoadingMessage('Suppression...');
+    
+    const { error } = await supprimerResident(residentId);
+    
+    setIsLoading(false);
+    
+    if (!error) {
+      await loadResidents();
+      return { success: true };
+    }
+    return { success: false, error: error?.message };
   };
 
   // Si pas authentifié, afficher l'écran de connexion
@@ -474,8 +889,24 @@ const App = () => {
   }
 
   if (userType === 'residence') {
+    // Compteurs pour le dashboard
+    const reclamationsEnCours = reclamationsData.filter(r => r.statut === 'en_cours').length;
+    const totalInscriptions = animationsData.reduce((acc, a) => acc + (a.inscriptions_animations?.length || 0), 0);
+
     const renderResidenceDashboard = () => (
       <div className="space-y-6">
+        {/* Bouton de rafraîchissement */}
+        <div className="flex justify-end">
+          <button
+            onClick={loadAllData}
+            disabled={isLoading}
+            className="flex items-center gap-2 px-4 py-2 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-lg transition-colors"
+          >
+            <RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />
+            Actualiser
+          </button>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div 
             onClick={() => setActiveResidenceScreen('reclamations')}
@@ -485,7 +916,7 @@ const App = () => {
               <h3 className="text-lg font-semibold text-gray-800">Réclamations</h3>
               <AlertCircle className="text-orange-600" size={32} />
             </div>
-            <p className="text-3xl font-bold text-orange-600">2</p>
+            <p className="text-3xl font-bold text-orange-600">{reclamationsEnCours}</p>
             <p className="text-sm text-gray-600">En cours de traitement</p>
           </div>
 
@@ -509,7 +940,7 @@ const App = () => {
               <h3 className="text-lg font-semibold text-gray-800">Événements</h3>
               <Calendar className="text-purple-600" size={32} />
             </div>
-            <p className="text-3xl font-bold text-purple-600">8</p>
+            <p className="text-3xl font-bold text-purple-600">{totalInscriptions}</p>
             <p className="text-sm text-gray-600">Inscriptions totales</p>
           </div>
         </div>
@@ -520,34 +951,53 @@ const App = () => {
             Demandes en attente de validation
           </h3>
           <div className="space-y-3">
-            {demandesEnAttente.map(demande => (
-              <div key={demande.id} className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                <div className="flex justify-between items-start mb-2">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-1">
-                      <span className="px-3 py-1 bg-blue-600 text-white rounded-full text-sm font-medium">
-                        {demande.type}
-                      </span>
-                      <span className="font-semibold text-gray-800">{demande.resident}</span>
+            {demandesEnAttente.length === 0 ? (
+              <p className="text-gray-500 text-center py-4">Aucune demande en attente</p>
+            ) : (
+              demandesEnAttente.map(demande => (
+                <div key={demande.id} className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-1">
+                        <span className="px-3 py-1 bg-blue-600 text-white rounded-full text-sm font-medium capitalize">
+                          {demande.type}
+                        </span>
+                        <span className="font-semibold text-gray-800">
+                          {demande.residents ? `${demande.residents.prenom} ${demande.residents.nom}` : 'Résident'}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-700 mt-2">
+                        {demande.date_souhaitee ? new Date(demande.date_souhaitee).toLocaleDateString('fr-FR') : new Date(demande.date_demande).toLocaleDateString('fr-FR')} {demande.heure && `à ${demande.heure}`}
+                      </p>
+                      {demande.sous_type && (
+                        <p className="text-sm text-gray-600 mt-1">Type: {demande.sous_type}</p>
+                      )}
+                      {demande.details && (
+                        <p className="text-sm text-gray-600 mt-1">{demande.details}</p>
+                      )}
                     </div>
-                    <p className="text-sm text-gray-700 mt-2">
-                      {demande.date} {demande.heure && `à ${demande.heure}`}
-                    </p>
-                    <p className="text-sm text-gray-600 mt-1">{demande.details}</p>
-                  </div>
-                  <div className="flex gap-2 ml-4">
-                    <button className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm flex items-center gap-1">
-                      <CheckCircle size={16} />
-                      Valider
-                    </button>
-                    <button className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm flex items-center gap-1">
-                      <XCircle size={16} />
-                      Refuser
-                    </button>
+                    <div className="flex gap-2 ml-4">
+                      <button 
+                        onClick={() => handleValiderDemande(demande.id, 'validee')}
+                        disabled={isLoading}
+                        className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded-lg text-sm flex items-center gap-1"
+                      >
+                        <CheckCircle size={16} />
+                        Valider
+                      </button>
+                      <button 
+                        onClick={() => handleValiderDemande(demande.id, 'refusee')}
+                        disabled={isLoading}
+                        className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white rounded-lg text-sm flex items-center gap-1"
+                      >
+                        <XCircle size={16} />
+                        Refuser
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 
@@ -557,30 +1007,32 @@ const App = () => {
             Réclamations en cours
           </h3>
           <div className="space-y-3">
-            <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="font-semibold text-orange-900">Problème de chauffage</p>
-                  <p className="text-sm text-gray-600 mt-1">Marie Dupont - 10/12/2024</p>
-                  <p className="text-sm text-gray-700 mt-2">Chambre 205 - Chauffage insuffisant</p>
+            {reclamationsData.filter(r => r.statut === 'en_cours').length === 0 ? (
+              <p className="text-gray-500 text-center py-4">Aucune réclamation en cours</p>
+            ) : (
+              reclamationsData.filter(r => r.statut === 'en_cours').map(rec => (
+                <div key={rec.id} className="p-4 bg-orange-50 rounded-lg border border-orange-200">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="font-semibold text-orange-900 capitalize">{rec.sujet}</p>
+                      <p className="text-sm text-gray-600 mt-1">
+                        {rec.residents ? `${rec.residents.prenom} ${rec.residents.nom}` : 'Résident'} - {new Date(rec.created_at).toLocaleDateString('fr-FR')}
+                      </p>
+                      {rec.description && (
+                        <p className="text-sm text-gray-700 mt-2">{rec.description}</p>
+                      )}
+                    </div>
+                    <button 
+                      onClick={() => handleTraiterReclamation(rec.id)}
+                      disabled={isLoading}
+                      className="px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white rounded-lg text-sm"
+                    >
+                      Marquer comme traité
+                    </button>
+                  </div>
                 </div>
-                <button className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm">
-                  Marquer comme traité
-                </button>
-              </div>
-            </div>
-            <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="font-semibold text-orange-900">Qualité du repas</p>
-                  <p className="text-sm text-gray-600 mt-1">Marie Dupont - 05/12/2024</p>
-                  <p className="text-sm text-gray-700 mt-2">Repas du midi - Température</p>
-                </div>
-                <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
-                  Traité
-                </span>
-              </div>
-            </div>
+              ))
+            )}
           </div>
         </div>
 
@@ -590,28 +1042,23 @@ const App = () => {
             Inscriptions aux événements
           </h3>
           <div className="space-y-3">
-            <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="font-semibold text-purple-900">Concert de piano</p>
-                  <p className="text-sm text-gray-600">20/12/2024 à 15h00</p>
+            {animationsData.length === 0 ? (
+              <p className="text-gray-500 text-center py-4">Aucun événement programmé</p>
+            ) : (
+              animationsData.map(anim => (
+                <div key={anim.id} className="p-4 bg-purple-50 rounded-lg border border-purple-200">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="font-semibold text-purple-900">{anim.titre}</p>
+                      <p className="text-sm text-gray-600">{new Date(anim.date).toLocaleDateString('fr-FR')} à {anim.heure}</p>
+                    </div>
+                    <span className="px-4 py-2 bg-purple-600 text-white rounded-lg font-semibold">
+                      {anim.inscriptions_animations?.length || 0} inscrits
+                    </span>
+                  </div>
                 </div>
-                <span className="px-4 py-2 bg-purple-600 text-white rounded-lg font-semibold">
-                  5 inscrits
-                </span>
-              </div>
-            </div>
-            <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="font-semibold text-purple-900">Atelier peinture</p>
-                  <p className="text-sm text-gray-600">22/12/2024 à 14h30</p>
-                </div>
-                <span className="px-4 py-2 bg-purple-600 text-white rounded-lg font-semibold">
-                  3 inscrits
-                </span>
-              </div>
-            </div>
+              ))
+            )}
           </div>
         </div>
       </div>
@@ -718,194 +1165,125 @@ const App = () => {
       );
     };
 
+    // Fonction helper pour formater les statuts
+    const formatStatut = (statut: string) => {
+      switch(statut) {
+        case 'en_attente': return 'En attente';
+        case 'validee': return 'Validée';
+        case 'refusee': return 'Refusée';
+        case 'en_cours': return 'En cours';
+        case 'terminee': return 'Terminée';
+        default: return statut;
+      }
+    };
+
+    const getStatutColor = (statut: string) => {
+      switch(statut) {
+        case 'en_attente': return 'bg-yellow-100 text-yellow-800';
+        case 'validee': return 'bg-green-100 text-green-800';
+        case 'refusee': return 'bg-red-100 text-red-800';
+        case 'en_cours': return 'bg-blue-100 text-blue-800';
+        case 'terminee': return 'bg-gray-100 text-gray-800';
+        default: return 'bg-gray-100 text-gray-800';
+      }
+    };
+
     const renderGestionDemandesSection = () => {
-      if (showProposeNewSlot && selectedDemande) {
-        return (
-          <div className="space-y-6">
-            <button
-              onClick={() => {
-                setShowProposeNewSlot(false);
-                setSelectedDemande(null);
-              }}
-              className="text-purple-600 hover:text-purple-700 font-semibold"
-            >
-              ← Retour
-            </button>
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <h3 className="text-xl font-semibold text-gray-800 mb-4">
-                Proposer un nouveau créneau - {selectedDemande.resident}
-              </h3>
-              <div className="mb-4 p-4 bg-blue-50 rounded-lg">
+      // Afficher une demande générique (format Supabase)
+      const renderDemandeCard = (demande: Demande, showActions = true) => (
+        <div key={demande.id} className={`p-4 rounded-lg border ${
+          demande.statut === 'en_attente' ? 'bg-yellow-50 border-yellow-200' :
+          demande.statut === 'validee' || demande.statut === 'terminee' ? 'bg-green-50 border-green-200' :
+          demande.statut === 'en_cours' ? 'bg-blue-50 border-blue-200' :
+          'bg-red-50 border-red-200'
+        }`}>
+          <div className="flex justify-between items-start mb-3">
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <span className="font-semibold text-gray-800">
+                  {demande.residents?.prenom} {demande.residents?.nom}
+                </span>
+                <span className="text-sm text-gray-600">
+                  Chambre {demande.residents?.chambre || '-'}
+                </span>
+              </div>
+              <p className="text-sm text-gray-700">
+                📅 {new Date(demande.date_demande).toLocaleDateString('fr-FR')}
+                {demande.heure && ` à ${demande.heure}`}
+              </p>
+              {demande.date_souhaitee && (
                 <p className="text-sm text-gray-700">
-                  <strong>Demande initiale:</strong> {selectedDemande.date} à {selectedDemande.heure}
+                  📆 Souhaité: {new Date(demande.date_souhaitee).toLocaleDateString('fr-FR')}
                 </p>
-              </div>
-
-              <div className="bg-indigo-50 p-4 rounded-lg mb-4">
-                <h4 className="font-semibold text-gray-800 mb-3">Planning du résident</h4>
-                <div className="space-y-2 max-h-60 overflow-y-auto">
-                  {['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi'].map(jour => (
-                    <div key={jour} className="text-sm">
-                      <span className="font-semibold text-indigo-900">{jour}:</span>
-                      <span className="text-gray-700 ml-2">08h00 Petit-déj, 10h00 Animation, 12h00 Déjeuner...</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Nouvelle date</label>
-                  <input type="date" className="w-full border border-gray-300 rounded-lg px-4 py-2" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Nouveau créneau</label>
-                  <input type="time" className="w-full border border-gray-300 rounded-lg px-4 py-2" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Message pour la famille</label>
-                  <textarea 
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 h-24"
-                    placeholder="Expliquez pourquoi vous proposez un nouveau créneau..."
-                  ></textarea>
-                </div>
-                <button className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold">
-                  Envoyer la proposition
-                </button>
-              </div>
+              )}
+              {demande.sous_type && (
+                <p className="text-sm font-medium text-gray-800 mt-1">🔧 {demande.sous_type}</p>
+              )}
+              {demande.details && (
+                <p className="text-sm text-gray-600 mt-2 p-2 bg-white rounded border">
+                  {demande.details}
+                </p>
+              )}
             </div>
+            <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatutColor(demande.statut)}`}>
+              {formatStatut(demande.statut)}
+            </span>
           </div>
-        );
-      }
+          {showActions && demande.statut === 'en_attente' && (
+            <div className="flex gap-2">
+              <button 
+                onClick={() => handleValiderDemande(demande.id, 'validee')}
+                disabled={isLoading}
+                className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white py-2 rounded-lg text-sm flex items-center justify-center gap-1"
+              >
+                <CheckCircle size={16} />
+                Accepter
+              </button>
+              <button 
+                onClick={() => handleValiderDemande(demande.id, 'en_cours')}
+                disabled={isLoading}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white py-2 rounded-lg text-sm flex items-center justify-center gap-1"
+              >
+                <Clock size={16} />
+                En cours
+              </button>
+              <button 
+                onClick={() => handleValiderDemande(demande.id, 'refusee')}
+                disabled={isLoading}
+                className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white py-2 rounded-lg text-sm flex items-center justify-center gap-1"
+              >
+                <XCircle size={16} />
+                Refuser
+              </button>
+            </div>
+          )}
+          {showActions && demande.statut === 'en_cours' && (
+            <div className="flex gap-2">
+              <button 
+                onClick={() => handleValiderDemande(demande.id, 'terminee')}
+                disabled={isLoading}
+                className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white py-2 rounded-lg text-sm"
+              >
+                ✓ Marquer comme terminée
+              </button>
+            </div>
+          )}
+        </div>
+      );
 
-      if (activeDemandeType === 'menage' || activeDemandeType === 'toilette') {
-        const demandes = activeDemandeType === 'menage' ? demandesMenage : demandesToilette;
-        const title = activeDemandeType === 'menage' ? 'Demandes de Ménage' : 'Demandes de Toilette';
+      // Vue détaillée d'un type de demande
+      if (activeDemandeType) {
+        const demandes = activeDemandeType === 'menage' ? demandesMenage :
+                         activeDemandeType === 'toilette' ? demandesToilette :
+                         activeDemandeType === 'courses' ? demandesCourses :
+                         activeDemandeType === 'maintenance' ? demandesMaintenance : [];
         
-        return (
-          <div className="space-y-6">
-            <button
-              onClick={() => setActiveDemandeType(null)}
-              className="text-purple-600 hover:text-purple-700 font-semibold"
-            >
-              ← Retour
-            </button>
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <h3 className="text-xl font-semibold text-gray-800 mb-4">{title}</h3>
-              <div className="space-y-4">
-                {demandes.map(demande => (
-                  <div key={demande.id} className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                    <div className="mb-3">
-                      <div className="flex items-center gap-3 mb-2">
-                        <span className="font-semibold text-gray-800">{demande.resident}</span>
-                        <span className="text-sm text-gray-600">Chambre {demande.chambre}</span>
-                      </div>
-                      <p className="text-sm text-gray-700">
-                        📅 {demande.date} à {demande.heure}
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <button className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg text-sm flex items-center justify-center gap-1">
-                        <CheckCircle size={16} />
-                        Accepter
-                      </button>
-                      <button 
-                        onClick={() => {
-                          setSelectedDemande(demande);
-                          setShowProposeNewSlot(true);
-                        }}
-                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm flex items-center justify-center gap-1"
-                      >
-                        <Calendar size={16} />
-                        Autre créneau
-                      </button>
-                      <button className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg text-sm flex items-center justify-center gap-1">
-                        <XCircle size={16} />
-                        Refuser
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        );
-      }
-
-      // Écran Courses
-      if (activeDemandeType === 'courses') {
-        return (
-          <div className="space-y-6">
-            <button
-              onClick={() => setActiveDemandeType(null)}
-              className="text-purple-600 hover:text-purple-700 font-semibold"
-            >
-              ← Retour
-            </button>
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <h3 className="text-xl font-semibold text-gray-800 mb-4">🛒 Demandes de Courses</h3>
-              <div className="space-y-4">
-                {demandesCourses.map(demande => (
-                  <div key={demande.id} className={`p-4 rounded-lg border ${
-                    demande.statut === 'Réalisé' ? 'bg-green-50 border-green-200' :
-                    demande.statut === 'En cours' ? 'bg-yellow-50 border-yellow-200' :
-                    'bg-orange-50 border-orange-200'
-                  }`}>
-                    <div className="flex justify-between items-start mb-3">
-                      <div>
-                        <div className="flex items-center gap-3 mb-2">
-                          <span className="font-semibold text-gray-800">{demande.resident}</span>
-                          <span className="text-sm text-gray-600">Chambre {demande.chambre}</span>
-                        </div>
-                        <p className="text-sm text-gray-700">📅 Demande: {demande.date}</p>
-                        <p className="text-sm text-gray-700">🚚 Livraison souhaitée: {demande.dateLivraison}</p>
-                      </div>
-                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                        demande.statut === 'Réalisé' ? 'bg-green-200 text-green-800' :
-                        demande.statut === 'En cours' ? 'bg-yellow-200 text-yellow-800' :
-                        'bg-orange-200 text-orange-800'
-                      }`}>
-                        {demande.statut}
-                      </span>
-                    </div>
-                    <div className="p-3 bg-white rounded-lg border border-gray-200 mb-3">
-                      <p className="text-sm font-medium text-gray-700 mb-1">Liste de courses:</p>
-                      <p className="text-sm text-gray-600">{demande.liste}</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <button 
-                        onClick={() => {
-                          setDemandesCourses(demandesCourses.map(d => 
-                            d.id === demande.id ? {...d, statut: 'En cours'} : d
-                          ));
-                        }}
-                        className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white py-2 rounded-lg text-sm"
-                      >
-                        En cours
-                      </button>
-                      <button 
-                        onClick={() => {
-                          setDemandesCourses(demandesCourses.map(d => 
-                            d.id === demande.id ? {...d, statut: 'Réalisé'} : d
-                          ));
-                        }}
-                        className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg text-sm"
-                      >
-                        Réalisé
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        );
-      }
-
-      // Écran Maintenance Technique
-      if (activeDemandeType === 'maintenance') {
-        const maintenanceEnCours = demandesMaintenance.filter(d => d.statut !== 'Fait');
-        const maintenanceArchives = demandesMaintenance.filter(d => d.statut === 'Fait');
+        const titles: {[key: string]: string} = {
+          menage: '🧹 Demandes de Ménage',
+          toilette: '🚿 Demandes de Toilette',
+          courses: '🛒 Demandes de Courses',
+          maintenance: '🔧 Maintenance Technique'
+        };
 
         return (
           <div className="space-y-6">
@@ -916,160 +1294,45 @@ const App = () => {
               ← Retour
             </button>
             <div className="bg-white rounded-xl shadow-md p-6">
-              <h3 className="text-xl font-semibold text-gray-800 mb-4">🔧 Maintenance Technique</h3>
+              <h3 className="text-xl font-semibold text-gray-800 mb-4">{titles[activeDemandeType] || 'Demandes'}</h3>
               
-              {/* Onglets */}
-              <div className="flex gap-4 mb-6">
-                <button
-                  onClick={() => setMaintenanceTab('en-cours')}
-                  className={`flex-1 py-3 rounded-lg font-semibold transition-colors ${
-                    maintenanceTab === 'en-cours'
-                      ? 'bg-red-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  En cours ({maintenanceEnCours.length})
-                </button>
-                <button
-                  onClick={() => setMaintenanceTab('archives')}
-                  className={`flex-1 py-3 rounded-lg font-semibold transition-colors ${
-                    maintenanceTab === 'archives'
-                      ? 'bg-green-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  Archives ({maintenanceArchives.length})
-                </button>
+              {/* Statistiques */}
+              <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className="p-3 bg-yellow-50 rounded-lg text-center border border-yellow-200">
+                  <p className="text-2xl font-bold text-yellow-600">
+                    {demandes.filter(d => d.statut === 'en_attente').length}
+                  </p>
+                  <p className="text-sm text-yellow-700">En attente</p>
+                </div>
+                <div className="p-3 bg-blue-50 rounded-lg text-center border border-blue-200">
+                  <p className="text-2xl font-bold text-blue-600">
+                    {demandes.filter(d => d.statut === 'en_cours').length}
+                  </p>
+                  <p className="text-sm text-blue-700">En cours</p>
+                </div>
+                <div className="p-3 bg-green-50 rounded-lg text-center border border-green-200">
+                  <p className="text-2xl font-bold text-green-600">
+                    {demandes.filter(d => d.statut === 'terminee' || d.statut === 'validee').length}
+                  </p>
+                  <p className="text-sm text-green-700">Terminées</p>
+                </div>
               </div>
 
-              {/* Onglet En cours */}
-              {maintenanceTab === 'en-cours' && (
-                <>
-                  {/* Statistiques */}
-                  <div className="grid grid-cols-2 gap-4 mb-6">
-                    <div className="p-3 bg-red-50 rounded-lg text-center border border-red-200">
-                      <p className="text-2xl font-bold text-red-600">
-                        {demandesMaintenance.filter(d => d.statut === 'À faire').length}
-                      </p>
-                      <p className="text-sm text-red-700">À faire</p>
-                    </div>
-                    <div className="p-3 bg-yellow-50 rounded-lg text-center border border-yellow-200">
-                      <p className="text-2xl font-bold text-yellow-600">
-                        {demandesMaintenance.filter(d => d.statut === 'En cours').length}
-                      </p>
-                      <p className="text-sm text-yellow-700">En cours</p>
-                    </div>
+              <div className="space-y-4">
+                {demandes.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <p>Aucune demande de ce type</p>
                   </div>
-
-                  <div className="space-y-4">
-                    {maintenanceEnCours.length === 0 ? (
-                      <div className="text-center py-8 text-gray-500">
-                        <p>Aucune intervention en cours</p>
-                      </div>
-                    ) : (
-                      maintenanceEnCours.map(demande => (
-                        <div key={demande.id} className={`p-4 rounded-lg border ${
-                          demande.statut === 'En cours' ? 'bg-yellow-50 border-yellow-200' :
-                          'bg-red-50 border-red-200'
-                        }`}>
-                          <div className="flex justify-between items-start mb-3">
-                            <div>
-                              <div className="flex items-center gap-3 mb-2">
-                                <span className="font-semibold text-gray-800">{demande.resident}</span>
-                                <span className="text-sm text-gray-600">Chambre {demande.chambre}</span>
-                              </div>
-                              <p className="text-sm text-gray-700">📅 Date demande: {demande.date}</p>
-                              <p className="text-sm font-medium text-gray-800 mt-2">🔧 {demande.objet}</p>
-                            </div>
-                            <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                              demande.statut === 'En cours' ? 'bg-yellow-200 text-yellow-800' :
-                              'bg-red-200 text-red-800'
-                            }`}>
-                              {demande.statut}
-                            </span>
-                          </div>
-                          <div className="flex gap-2">
-                            <button 
-                              onClick={() => {
-                                setDemandesMaintenance(demandesMaintenance.map(d => 
-                                  d.id === demande.id ? {...d, statut: 'À faire'} : d
-                                ));
-                              }}
-                              className="flex-1 bg-red-500 hover:bg-red-600 text-white py-2 rounded-lg text-sm"
-                            >
-                              À faire
-                            </button>
-                            <button 
-                              onClick={() => {
-                                setDemandesMaintenance(demandesMaintenance.map(d => 
-                                  d.id === demande.id ? {...d, statut: 'En cours'} : d
-                                ));
-                              }}
-                              className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white py-2 rounded-lg text-sm"
-                            >
-                              En cours
-                            </button>
-                            <button 
-                              onClick={() => {
-                                setDemandesMaintenance(demandesMaintenance.map(d => 
-                                  d.id === demande.id ? {...d, statut: 'Fait'} : d
-                                ));
-                              }}
-                              className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg text-sm"
-                            >
-                              ✓ Fait
-                            </button>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </>
-              )}
-
-              {/* Onglet Archives */}
-              {maintenanceTab === 'archives' && (
-                <div className="space-y-4">
-                  {maintenanceArchives.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">
-                      <p>Aucune intervention archivée</p>
-                    </div>
-                  ) : (
-                    maintenanceArchives.map(demande => (
-                      <div key={demande.id} className="p-4 rounded-lg border bg-green-50 border-green-200">
-                        <div className="flex justify-between items-start mb-3">
-                          <div>
-                            <div className="flex items-center gap-3 mb-2">
-                              <span className="font-semibold text-gray-800">{demande.resident}</span>
-                              <span className="text-sm text-gray-600">Chambre {demande.chambre}</span>
-                            </div>
-                            <p className="text-sm text-gray-700">📅 Date demande: {demande.date}</p>
-                            <p className="text-sm font-medium text-gray-800 mt-2">🔧 {demande.objet}</p>
-                          </div>
-                          <span className="px-3 py-1 rounded-full text-sm font-medium bg-green-200 text-green-800">
-                            ✓ Fait
-                          </span>
-                        </div>
-                        <button 
-                          onClick={() => {
-                            setDemandesMaintenance(demandesMaintenance.map(d => 
-                              d.id === demande.id ? {...d, statut: 'À faire'} : d
-                            ));
-                          }}
-                          className="w-full bg-gray-400 hover:bg-gray-500 text-white py-2 rounded-lg text-sm"
-                        >
-                          Remettre en cours
-                        </button>
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
+                ) : (
+                  demandes.map(demande => renderDemandeCard(demande))
+                )}
+              </div>
             </div>
           </div>
         );
       }
 
+      // Vue principale avec les catégories
       return (
         <div className="space-y-6">
           <div className="bg-white rounded-xl shadow-md p-6">
@@ -1082,7 +1345,7 @@ const App = () => {
                 <div className="text-center">
                   <h4 className="text-xl font-bold text-blue-900 mb-2">🧹 Demandes de Ménage</h4>
                   <p className="text-3xl font-bold text-blue-600">{demandesMenage.length}</p>
-                  <p className="text-sm text-gray-600 mt-1">en attente</p>
+                  <p className="text-sm text-gray-600 mt-1">demandes</p>
                 </div>
               </button>
               <button
@@ -1092,7 +1355,7 @@ const App = () => {
                 <div className="text-center">
                   <h4 className="text-xl font-bold text-purple-900 mb-2">🚿 Demandes de Toilette</h4>
                   <p className="text-3xl font-bold text-purple-600">{demandesToilette.length}</p>
-                  <p className="text-sm text-gray-600 mt-1">en attente</p>
+                  <p className="text-sm text-gray-600 mt-1">demandes</p>
                 </div>
               </button>
               <button
@@ -1508,8 +1771,9 @@ const App = () => {
       const renderAgenda = () => {
         const selectedResidentData = residents.find(r => r.id === selectedResidentPlanning);
         const selectedPersonnelData = personnel.find(p => p.id === selectedPersonnelPlanning);
-        const residentPlanning = planningResidents[selectedResidentPlanning] || {};
-        const personnelPlanningData = planningPersonnel[selectedPersonnelPlanning] || {};
+        // Utiliser le planning par défaut si un résident est sélectionné
+        const residentPlanning = selectedResidentPlanning ? planningResidentDefault : {};
+        const personnelPlanningData = selectedPersonnelPlanning ? (planningPersonnel[selectedPersonnelPlanning] || {}) : {};
 
         return (
           <div className="overflow-x-auto">
@@ -1639,7 +1903,7 @@ const App = () => {
                 </label>
                 <select
                   value={selectedResidentPlanning || ''}
-                  onChange={(e) => setSelectedResidentPlanning(Number(e.target.value) || null)}
+                  onChange={(e) => setSelectedResidentPlanning(e.target.value || null)}
                   className="w-full border border-gray-300 rounded-lg px-4 py-2"
                 >
                   <option value="">-- Choisir un résident --</option>
@@ -2909,94 +3173,156 @@ const App = () => {
     </div>
   );
 
-  const renderFamilyDashboard = () => (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <button 
-          onClick={() => setActiveScreen('prestation')}
-          className="bg-white rounded-xl shadow-md p-6 text-left hover:shadow-lg transition-all hover:scale-105 hover:border-blue-300 border-2 border-transparent"
-        >
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-lg font-semibold text-gray-800">Demandes</h3>
-            <Clock className="text-blue-600" size={32} />
-          </div>
-          <p className="text-3xl font-bold text-blue-600">3</p>
-          <p className="text-sm text-gray-600">En attente de validation</p>
-        </button>
+  const renderFamilyDashboard = () => {
+    // Données du résident connecté
+    const resident = currentUser?.resident;
+    const residence = currentUser?.residence;
+    
+    // Compteurs dynamiques
+    const mesDemandesEnAttente = toutesLesDemandes.filter(d => d.statut === 'en_attente').length;
+    const mesReclamationsEnCours = reclamationsData.filter(r => r.statut === 'en_cours').length;
+    
+    // Prochaine animation
+    const prochaineAnimation = animationsData.length > 0 
+      ? animationsData.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0]
+      : null;
 
-        <button 
-          onClick={() => setActiveScreen('reclamation')}
-          className="bg-white rounded-xl shadow-md p-6 text-left hover:shadow-lg transition-all hover:scale-105 hover:border-orange-300 border-2 border-transparent"
-        >
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-lg font-semibold text-gray-800">Réclamations</h3>
-            <AlertCircle className="text-orange-600" size={32} />
-          </div>
-          <p className="text-3xl font-bold text-orange-600">1</p>
-          <p className="text-sm text-gray-600">En cours de traitement</p>
-        </button>
-
-        <button 
-          onClick={() => setActiveScreen('facturation')}
-          className="bg-white rounded-xl shadow-md p-6 text-left hover:shadow-lg transition-all hover:scale-105 hover:border-green-300 border-2 border-transparent"
-        >
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-lg font-semibold text-gray-800">Prochaine facture</h3>
-            <Euro className="text-green-600" size={32} />
-          </div>
-          <p className="text-3xl font-bold text-green-600">2 970€</p>
-          <p className="text-sm text-gray-600">Échéance: 31/12/2024</p>
-        </button>
-      </div>
-
-      <button 
-        onClick={() => setActiveScreen('resident')}
-        className="w-full bg-white rounded-xl shadow-md p-6 text-left hover:shadow-lg transition-all hover:border-indigo-300 border-2 border-transparent"
-      >
-        <h3 className="text-xl font-semibold text-gray-800 mb-4">Résident - Marie Dupont</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="p-3 bg-indigo-50 rounded-lg">
-            <p className="text-sm text-gray-600">Chambre</p>
-            <p className="text-lg font-semibold text-indigo-900">205</p>
-          </div>
-          <div className="p-3 bg-indigo-50 rounded-lg">
-            <p className="text-sm text-gray-600">Niveau GIR</p>
-            <p className="text-lg font-semibold text-indigo-900">GIR 3</p>
-          </div>
-          <div className="p-3 bg-yellow-50 rounded-lg">
-            <p className="text-sm text-gray-600">Régime alimentaire</p>
-            <p className="text-lg font-semibold text-yellow-900">Sans sel</p>
-          </div>
-          <div className="p-3 bg-purple-50 rounded-lg">
-            <p className="text-sm text-gray-600">Prochaine animation</p>
-            <p className="text-lg font-semibold text-purple-900">Concert - 20/12</p>
-          </div>
+    return (
+      <div className="space-y-6">
+        {/* Bouton de rafraîchissement */}
+        <div className="flex justify-between items-center">
+          <h2 className="text-xl font-bold text-gray-800">
+            Bienvenue, famille de {resident?.prenom} {resident?.nom}
+          </h2>
+          <button
+            onClick={loadAllData}
+            disabled={isLoading}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded-lg transition-colors"
+          >
+            <RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />
+            Actualiser
+          </button>
         </div>
-      </button>
 
-      <button 
-        onClick={() => setActiveScreen('evenements')}
-        className="w-full bg-white rounded-xl shadow-md p-6 text-left hover:shadow-lg transition-all hover:border-purple-300 border-2 border-transparent"
-      >
-        <h3 className="text-xl font-semibold text-gray-800 mb-4">Planning de la semaine</h3>
-        <div className="space-y-2">
-          <div className="p-3 bg-purple-50 rounded-lg flex justify-between items-center">
-            <span className="text-sm text-gray-700">Lundi 16/12 - 10h00</span>
-            <span className="text-sm font-semibold text-purple-700">Atelier mémoire</span>
-          </div>
-          <div className="p-3 bg-purple-50 rounded-lg flex justify-between items-center">
-            <span className="text-sm text-gray-700">Mercredi 18/12 - 14h30</span>
-            <span className="text-sm font-semibold text-purple-700">Gymnastique douce</span>
-          </div>
-          <div className="p-3 bg-purple-50 rounded-lg flex justify-between items-center">
-            <span className="text-sm text-gray-700">Vendredi 20/12 - 15h00</span>
-            <span className="text-sm font-semibold text-purple-700">Concert de piano</span>
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <button 
+            onClick={() => setActiveScreen('prestation')}
+            className="bg-white rounded-xl shadow-md p-6 text-left hover:shadow-lg transition-all hover:scale-105 hover:border-blue-300 border-2 border-transparent"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-lg font-semibold text-gray-800">Demandes</h3>
+              <Clock className="text-blue-600" size={32} />
+            </div>
+            <p className="text-3xl font-bold text-blue-600">{mesDemandesEnAttente}</p>
+            <p className="text-sm text-gray-600">En attente de validation</p>
+          </button>
+
+          <button 
+            onClick={() => setActiveScreen('reclamation')}
+            className="bg-white rounded-xl shadow-md p-6 text-left hover:shadow-lg transition-all hover:scale-105 hover:border-orange-300 border-2 border-transparent"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-lg font-semibold text-gray-800">Réclamations</h3>
+              <AlertCircle className="text-orange-600" size={32} />
+            </div>
+            <p className="text-3xl font-bold text-orange-600">{mesReclamationsEnCours}</p>
+            <p className="text-sm text-gray-600">En cours de traitement</p>
+          </button>
+
+          <button 
+            onClick={() => setActiveScreen('evenements')}
+            className="bg-white rounded-xl shadow-md p-6 text-left hover:shadow-lg transition-all hover:scale-105 hover:border-purple-300 border-2 border-transparent"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-lg font-semibold text-gray-800">Événements</h3>
+              <Calendar className="text-purple-600" size={32} />
+            </div>
+            <p className="text-3xl font-bold text-purple-600">{animationsData.length}</p>
+            <p className="text-sm text-gray-600">À venir</p>
+          </button>
         </div>
-      </button>
 
+        <button 
+          onClick={() => setActiveScreen('resident')}
+          className="w-full bg-white rounded-xl shadow-md p-6 text-left hover:shadow-lg transition-all hover:border-indigo-300 border-2 border-transparent"
+        >
+          <h3 className="text-xl font-semibold text-gray-800 mb-4">
+            Résident - {resident?.prenom} {resident?.nom}
+          </h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="p-3 bg-indigo-50 rounded-lg">
+              <p className="text-sm text-gray-600">Chambre</p>
+              <p className="text-lg font-semibold text-indigo-900">{resident?.chambre || '-'}</p>
+            </div>
+            <div className="p-3 bg-indigo-50 rounded-lg">
+              <p className="text-sm text-gray-600">Niveau GIR</p>
+              <p className="text-lg font-semibold text-indigo-900">{resident?.gir || '-'}</p>
+            </div>
+            <div className="p-3 bg-yellow-50 rounded-lg">
+              <p className="text-sm text-gray-600">Régime alimentaire</p>
+              <p className="text-lg font-semibold text-yellow-900">{resident?.regime_alimentaire || 'Normal'}</p>
+            </div>
+            <div className="p-3 bg-purple-50 rounded-lg">
+              <p className="text-sm text-gray-600">Résidence</p>
+              <p className="text-lg font-semibold text-purple-900">{residence?.nom || '-'}</p>
+            </div>
+          </div>
+        </button>
+
+        {/* Événements à venir */}
+        <button 
+          onClick={() => setActiveScreen('evenements')}
+          className="w-full bg-white rounded-xl shadow-md p-6 text-left hover:shadow-lg transition-all hover:border-purple-300 border-2 border-transparent"
+        >
+          <h3 className="text-xl font-semibold text-gray-800 mb-4">Événements à venir</h3>
+          <div className="space-y-2">
+            {animationsData.length === 0 ? (
+              <p className="text-gray-500 text-center py-4">Aucun événement programmé</p>
+            ) : (
+              animationsData.slice(0, 3).map(anim => (
+                <div key={anim.id} className="p-3 bg-purple-50 rounded-lg flex justify-between items-center">
+                  <span className="text-sm text-gray-700">
+                    {new Date(anim.date).toLocaleDateString('fr-FR')} - {anim.heure}
+                  </span>
+                  <span className="text-sm font-semibold text-purple-700">{anim.titre}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </button>
+
+        {/* Mes dernières demandes */}
+        {toutesLesDemandes.length > 0 && (
+          <div className="bg-white rounded-xl shadow-md p-6">
+            <h3 className="text-xl font-semibold text-gray-800 mb-4">Mes dernières demandes</h3>
+            <div className="space-y-2">
+              {toutesLesDemandes.slice(0, 3).map(demande => (
+                <div key={demande.id} className="p-3 bg-gray-50 rounded-lg flex justify-between items-center">
+                  <div>
+                    <span className="font-medium text-gray-800 capitalize">{demande.type}</span>
+                    <span className="text-sm text-gray-500 ml-2">
+                      {new Date(demande.date_demande).toLocaleDateString('fr-FR')}
+                    </span>
+                  </div>
+                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                    demande.statut === 'en_attente' ? 'bg-yellow-100 text-yellow-700' :
+                    demande.statut === 'validee' ? 'bg-green-100 text-green-700' :
+                    demande.statut === 'refusee' ? 'bg-red-100 text-red-700' :
+                    'bg-blue-100 text-blue-700'
+                  }`}>
+                    {demande.statut === 'en_attente' ? 'En attente' :
+                     demande.statut === 'validee' ? 'Validée' :
+                     demande.statut === 'refusee' ? 'Refusée' :
+                     demande.statut === 'en_cours' ? 'En cours' : 'Terminée'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
-  );
+    );
+  };
 
   const renderFacturation = () => {
     const handleDownloadPDF = () => {
@@ -3063,76 +3389,125 @@ const App = () => {
     );
   };
 
-  const renderReclamation = () => (
-    <div className="space-y-6">
-      <button
-        onClick={() => setShowNewReclamation(true)}
-        className="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold py-3 px-6 rounded-xl transition-colors flex items-center justify-center gap-2"
-      >
-        <Plus size={20} />
-        Nouvelle Réclamation
-      </button>
+  const renderReclamation = () => {
+    const handleSubmitReclamation = async () => {
+      if (!reclamationSujet) {
+        alert('Veuillez sélectionner un sujet');
+        return;
+      }
+      
+      const result = await handleCreerReclamation(reclamationSujet, reclamationDescription);
+      
+      if (result.success) {
+        setShowNewReclamation(false);
+        setReclamationSujet('');
+        setReclamationDescription('');
+        setReclamationSuccessMessage('Réclamation envoyée avec succès !');
+        setTimeout(() => setReclamationSuccessMessage(''), 3000);
+      } else {
+        alert('Erreur: ' + result.error);
+      }
+    };
 
-      {showNewReclamation && (
-        <div className="bg-white rounded-xl shadow-md p-6">
-          <h3 className="text-xl font-semibold text-gray-800 mb-4">Nouvelle Réclamation</h3>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Sujet</label>
-              <select className="w-full border border-gray-300 rounded-lg px-4 py-2">
-                <option value="">Sélectionnez un sujet</option>
-                <option value="maintenance">Maintenance</option>
-                <option value="restauration">Restauration</option>
-                <option value="personnel">Personnel</option>
-                <option value="menage">Ménage</option>
-                <option value="toilette">Toilette</option>
-                <option value="animation">Animation</option>
-                <option value="autre">Autre</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
-              <textarea className="w-full border border-gray-300 rounded-lg px-4 py-2 h-32" placeholder="Décrivez votre réclamation..."></textarea>
-            </div>
-            <div className="flex gap-3">
-              <button className="flex-1 bg-orange-600 hover:bg-orange-700 text-white py-2 rounded-lg">
-                Soumettre
-              </button>
-              <button
-                onClick={() => setShowNewReclamation(false)}
-                className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 rounded-lg"
-              >
-                Annuler
-              </button>
+    return (
+      <div className="space-y-6">
+        {reclamationSuccessMessage && (
+          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg flex items-center gap-2">
+            <CheckCircle size={20} />
+            {reclamationSuccessMessage}
+          </div>
+        )}
+
+        <button
+          onClick={() => setShowNewReclamation(true)}
+          disabled={isLoading}
+          className="w-full bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white font-semibold py-3 px-6 rounded-xl transition-colors flex items-center justify-center gap-2"
+        >
+          <Plus size={20} />
+          Nouvelle Réclamation
+        </button>
+
+        {showNewReclamation && (
+          <div className="bg-white rounded-xl shadow-md p-6">
+            <h3 className="text-xl font-semibold text-gray-800 mb-4">Nouvelle Réclamation</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Sujet</label>
+                <select 
+                  value={reclamationSujet}
+                  onChange={(e) => setReclamationSujet(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                >
+                  <option value="">Sélectionnez un sujet</option>
+                  <option value="maintenance">Maintenance</option>
+                  <option value="restauration">Restauration</option>
+                  <option value="personnel">Personnel</option>
+                  <option value="menage">Ménage</option>
+                  <option value="toilette">Toilette</option>
+                  <option value="animation">Animation</option>
+                  <option value="autre">Autre</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                <textarea 
+                  value={reclamationDescription}
+                  onChange={(e) => setReclamationDescription(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 h-32" 
+                  placeholder="Décrivez votre réclamation..."
+                ></textarea>
+              </div>
+              <div className="flex gap-3">
+                <button 
+                  onClick={handleSubmitReclamation}
+                  disabled={isLoading || !reclamationSujet}
+                  className="flex-1 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white py-2 rounded-lg"
+                >
+                  {isLoading ? 'Envoi...' : 'Soumettre'}
+                </button>
+                <button
+                  onClick={() => setShowNewReclamation(false)}
+                  className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 rounded-lg"
+                >
+                  Annuler
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      <div className="bg-white rounded-xl shadow-md p-6">
-        <h3 className="text-xl font-semibold text-gray-800 mb-4">Mes Réclamations</h3>
-        <div className="space-y-3">
-          {reclamations.map(rec => (
-            <div key={rec.id} className="p-4 bg-gray-50 rounded-lg">
-              <div className="flex justify-between items-start mb-2">
-                <p className="font-semibold text-gray-800">{rec.sujet}</p>
-                {rec.statut === 'En cours' ? (
-                  <span className="flex items-center gap-1 text-orange-600 text-sm">
-                    <Clock size={16} /> En cours
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1 text-green-600 text-sm">
-                    <CheckCircle size={16} /> Traité
-                  </span>
-                )}
-              </div>
-              <p className="text-sm text-gray-600">Date: {rec.date}</p>
-            </div>
-          ))}
+        <div className="bg-white rounded-xl shadow-md p-6">
+          <h3 className="text-xl font-semibold text-gray-800 mb-4">Mes Réclamations</h3>
+          <div className="space-y-3">
+            {reclamations.length === 0 ? (
+              <p className="text-gray-500 text-center py-4">Aucune réclamation</p>
+            ) : (
+              reclamations.map(rec => (
+                <div key={rec.id} className="p-4 bg-gray-50 rounded-lg">
+                  <div className="flex justify-between items-start mb-2">
+                    <p className="font-semibold text-gray-800 capitalize">{rec.sujet}</p>
+                    {rec.statut === 'En cours' ? (
+                      <span className="flex items-center gap-1 text-orange-600 text-sm">
+                        <Clock size={16} /> En cours
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-green-600 text-sm">
+                        <CheckCircle size={16} /> Traité
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-600">Date: {rec.date}</p>
+                  {rec.description && (
+                    <p className="text-sm text-gray-700 mt-2">{rec.description}</p>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderEvenements = () => (
     <div className="space-y-6">
@@ -3265,103 +3640,19 @@ const App = () => {
     }
 
     if (prestationType === 'courses') {
-      return (
-        <div className="bg-white rounded-xl shadow-md p-6">
-          <h3 className="text-xl font-semibold text-gray-800 mb-4">
-            Commander des Courses
-          </h3>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Résident</label>
-              <select className="w-full border border-gray-300 rounded-lg px-4 py-2">
-                {residents.map(r => (
-                  <option key={r.id}>{r.prenom} {r.nom}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Liste de courses</label>
-              <textarea 
-                className="w-full border border-gray-300 rounded-lg px-4 py-2 h-48" 
-                placeholder="Exemple :
-- Pain
-- Lait
-- Fruits
-- Fromage"
-              ></textarea>
-            </div>
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-800">
-                Cette demande sera envoyée à l'établissement pour traitement
-              </p>
-            </div>
-            <div className="flex gap-3">
-              <button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg">
-                Envoyer la demande
-              </button>
-              <button
-                onClick={() => {
-                  setShowNewPrestation(false);
-                  setPrestationType(null);
-                }}
-                className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 rounded-lg"
-              >
-                Annuler
-              </button>
-            </div>
-          </div>
-        </div>
-      );
+      return <CoursesForm 
+        onSubmit={handleCreerDemande}
+        onCancel={() => { setShowNewPrestation(false); setPrestationType(null); }}
+        isLoading={isLoading}
+      />;
     }
 
     if (prestationType === 'maintenance') {
-      return (
-        <div className="bg-white rounded-xl shadow-md p-6">
-          <h3 className="text-xl font-semibold text-gray-800 mb-4">
-            Demande de Maintenance Technique
-          </h3>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Nature de l'intervention</label>
-              <select className="w-full border border-gray-300 rounded-lg px-4 py-2">
-                <option value="">Sélectionnez le type d'intervention</option>
-                <option value="electricite">Électricité</option>
-                <option value="plomberie">Plomberie</option>
-                <option value="chauffage">Chauffage</option>
-                <option value="menuiserie">Menuiserie</option>
-                <option value="serrurerie">Serrurerie</option>
-                <option value="autre">Autre</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Description de la situation</label>
-              <textarea 
-                className="w-full border border-gray-300 rounded-lg px-4 py-2 h-32" 
-                placeholder="Décrivez le problème technique rencontré..."
-              ></textarea>
-            </div>
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-800">
-                Un technicien interviendra dans les meilleurs délais
-              </p>
-            </div>
-            <div className="flex gap-3">
-              <button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg">
-                Envoyer la demande
-              </button>
-              <button
-                onClick={() => {
-                  setShowNewPrestation(false);
-                  setPrestationType(null);
-                }}
-                className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 rounded-lg"
-              >
-                Annuler
-              </button>
-            </div>
-          </div>
-        </div>
-      );
+      return <MaintenanceForm 
+        onSubmit={handleCreerDemande}
+        onCancel={() => { setShowNewPrestation(false); setPrestationType(null); }}
+        isLoading={isLoading}
+      />;
     }
 
     if (prestationType === 'reservations') {
@@ -3446,57 +3737,22 @@ const App = () => {
     }
 
     if (prestationType === 'repas') {
-      return <RepasForm residents={residents} setShowNewPrestation={setShowNewPrestation} setPrestationType={setPrestationType} />;
+      return <RepasForm 
+        residents={residents} 
+        setShowNewPrestation={setShowNewPrestation} 
+        setPrestationType={setPrestationType}
+        onSubmit={handleCreerDemande}
+        isLoading={isLoading}
+      />;
     }
 
-    return (
-      <div className="bg-white rounded-xl shadow-md p-6">
-        <h3 className="text-xl font-semibold text-gray-800 mb-4">
-          Commander: {prestationType}
-        </h3>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Résident</label>
-            <select className="w-full border border-gray-300 rounded-lg px-4 py-2">
-              {residents.map(r => (
-                <option key={r.id}>{r.prenom} {r.nom}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
-            <input type="date" className="w-full border border-gray-300 rounded-lg px-4 py-2" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Heure</label>
-            <input type="time" className="w-full border border-gray-300 rounded-lg px-4 py-2" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Remarques</label>
-            <textarea className="w-full border border-gray-300 rounded-lg px-4 py-2 h-24"></textarea>
-          </div>
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <p className="text-sm text-blue-800">
-              Cette demande sera envoyée à l'établissement pour validation
-            </p>
-          </div>
-          <div className="flex gap-3">
-            <button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg">
-              Envoyer la demande
-            </button>
-            <button
-              onClick={() => {
-                setShowNewPrestation(false);
-                setPrestationType(null);
-              }}
-              className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 rounded-lg"
-            >
-              Annuler
-            </button>
-          </div>
-        </div>
-      </div>
-    );
+    // Formulaire générique pour ménage, toilette
+    return <GenericPrestationForm 
+      type={prestationType || ''}
+      onSubmit={handleCreerDemande}
+      onCancel={() => { setShowNewPrestation(false); setPrestationType(null); }}
+      isLoading={isLoading}
+    />;
   };
 
   // Écran résident pour l'espace famille (LECTURE SEULE)
@@ -3952,18 +4208,46 @@ const PrestationCard = ({ title, description, onClick }) => (
   </button>
 );
 
-const RepasForm = ({ residents, setShowNewPrestation, setPrestationType }) => {
+const RepasForm = ({ residents, setShowNewPrestation, setPrestationType, onSubmit, isLoading }: any) => {
   const [selectedResidentId, setSelectedResidentId] = React.useState(residents[0]?.id);
   const [lieuRepas, setLieuRepas] = React.useState('chambre');
   const [nbAccompagnants, setNbAccompagnants] = React.useState(0);
   const [accompagnants, setAccompagnants] = React.useState([{ nom: '', prenom: '' }]);
   const [selectedRepasType, setSelectedRepasType] = React.useState('dejeuner');
+  const [selectedDate, setSelectedDate] = React.useState('');
+  const [remarques, setRemarques] = React.useState('');
   
-  const selectedResidentData = residents.find(r => r.id === selectedResidentId);
+  const selectedResidentData = residents.find((r: any) => r.id === selectedResidentId);
 
   const handleAddAccompagnant = () => {
     setAccompagnants([...accompagnants, { nom: '', prenom: '' }]);
     setNbAccompagnants(nbAccompagnants + 1);
+  };
+
+  const handleSubmit = async () => {
+    if (!selectedDate) {
+      alert('Veuillez sélectionner une date');
+      return;
+    }
+    
+    let details = `Type: ${selectedRepasType}, Lieu: ${lieuRepas}`;
+    if (lieuRepas === 'accompagnants' && accompagnants.length > 0) {
+      const accompagnantsNoms = accompagnants.filter(a => a.nom || a.prenom).map(a => `${a.prenom} ${a.nom}`).join(', ');
+      details += `, Accompagnants: ${accompagnantsNoms}`;
+    }
+    if (remarques) {
+      details += `, Remarques: ${remarques}`;
+    }
+    
+    const result = await onSubmit('repas', selectedRepasType, selectedDate, undefined, details);
+    
+    if (result.success) {
+      alert('Demande de repas envoyée avec succès !');
+      setShowNewPrestation(false);
+      setPrestationType(null);
+    } else {
+      alert('Erreur: ' + result.error);
+    }
   };
 
   const handleRemoveAccompagnant = (index) => {
@@ -4132,11 +4416,18 @@ const RepasForm = ({ residents, setShowNewPrestation, setPrestationType }) => {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
-          <input type="date" className="w-full border border-gray-300 rounded-lg px-4 py-2" />
+          <input 
+            type="date" 
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-4 py-2" 
+          />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Remarques</label>
           <textarea 
+            value={remarques}
+            onChange={(e) => setRemarques(e.target.value)}
             className="w-full border border-gray-300 rounded-lg px-4 py-2 h-24"
             placeholder="Ex: Anniversaire de Mamie, merci de prévoir un gâteau..."
           ></textarea>
@@ -4147,8 +4438,12 @@ const RepasForm = ({ residents, setShowNewPrestation, setPrestationType }) => {
           </p>
         </div>
         <div className="flex gap-3">
-          <button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-semibold">
-            Envoyer la réservation
+          <button 
+            onClick={handleSubmit}
+            disabled={isLoading || !selectedDate}
+            className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white py-2 rounded-lg font-semibold"
+          >
+            {isLoading ? 'Envoi...' : 'Envoyer la réservation'}
           </button>
           <button
             onClick={() => {
@@ -4157,6 +4452,237 @@ const RepasForm = ({ residents, setShowNewPrestation, setPrestationType }) => {
             }}
             className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 rounded-lg"
           >
+            Annuler
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ================================================
+// COMPOSANTS DE FORMULAIRES POUR LES DEMANDES
+// ================================================
+
+// Formulaire de maintenance technique
+const MaintenanceForm = ({ onSubmit, onCancel, isLoading }: any) => {
+  const [sousType, setSousType] = React.useState('');
+  const [description, setDescription] = React.useState('');
+
+  const handleSubmit = async () => {
+    if (!sousType) {
+      alert('Veuillez sélectionner le type d\'intervention');
+      return;
+    }
+    
+    const result = await onSubmit('maintenance', sousType, undefined, undefined, description);
+    
+    if (result.success) {
+      alert('Demande de maintenance envoyée avec succès !');
+      onCancel();
+    } else {
+      alert('Erreur: ' + result.error);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-md p-6">
+      <h3 className="text-xl font-semibold text-gray-800 mb-4">
+        🔧 Demande de Maintenance Technique
+      </h3>
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Nature de l'intervention</label>
+          <select 
+            value={sousType}
+            onChange={(e) => setSousType(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-4 py-2"
+          >
+            <option value="">Sélectionnez le type d'intervention</option>
+            <option value="electricite">Électricité</option>
+            <option value="plomberie">Plomberie</option>
+            <option value="chauffage">Chauffage</option>
+            <option value="menuiserie">Menuiserie</option>
+            <option value="serrurerie">Serrurerie</option>
+            <option value="autre">Autre</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Description de la situation</label>
+          <textarea 
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-4 py-2 h-32" 
+            placeholder="Décrivez le problème technique rencontré..."
+          ></textarea>
+        </div>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <p className="text-sm text-blue-800">
+            Un technicien interviendra dans les meilleurs délais
+          </p>
+        </div>
+        <div className="flex gap-3">
+          <button 
+            onClick={handleSubmit}
+            disabled={isLoading || !sousType}
+            className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white py-2 rounded-lg"
+          >
+            {isLoading ? 'Envoi...' : 'Envoyer la demande'}
+          </button>
+          <button onClick={onCancel} className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 rounded-lg">
+            Annuler
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Formulaire de courses
+const CoursesForm = ({ onSubmit, onCancel, isLoading }: any) => {
+  const [listeCourses, setListeCourses] = React.useState('');
+  const [dateLivraison, setDateLivraison] = React.useState('');
+
+  const handleSubmit = async () => {
+    if (!listeCourses.trim()) {
+      alert('Veuillez entrer la liste des courses');
+      return;
+    }
+    
+    const result = await onSubmit('courses', undefined, dateLivraison || undefined, undefined, listeCourses);
+    
+    if (result.success) {
+      alert('Demande de courses envoyée avec succès !');
+      onCancel();
+    } else {
+      alert('Erreur: ' + result.error);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-md p-6">
+      <h3 className="text-xl font-semibold text-gray-800 mb-4">
+        🛒 Commander des Courses
+      </h3>
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Liste de courses</label>
+          <textarea 
+            value={listeCourses}
+            onChange={(e) => setListeCourses(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-4 py-2 h-48" 
+            placeholder="Exemple :
+- Pain
+- Lait
+- Fruits
+- Fromage"
+          ></textarea>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Date de livraison souhaitée (optionnel)</label>
+          <input 
+            type="date" 
+            value={dateLivraison}
+            onChange={(e) => setDateLivraison(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-4 py-2" 
+          />
+        </div>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <p className="text-sm text-blue-800">
+            Cette demande sera envoyée à l'établissement pour traitement
+          </p>
+        </div>
+        <div className="flex gap-3">
+          <button 
+            onClick={handleSubmit}
+            disabled={isLoading || !listeCourses.trim()}
+            className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white py-2 rounded-lg"
+          >
+            {isLoading ? 'Envoi...' : 'Envoyer la demande'}
+          </button>
+          <button onClick={onCancel} className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 rounded-lg">
+            Annuler
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Formulaire générique (ménage, toilette)
+const GenericPrestationForm = ({ type, onSubmit, onCancel, isLoading }: any) => {
+  const [dateSouhaitee, setDateSouhaitee] = React.useState('');
+  const [heure, setHeure] = React.useState('');
+  const [remarques, setRemarques] = React.useState('');
+
+  const typeLabels: {[key: string]: string} = {
+    menage: '🧹 Demande de Ménage',
+    toilette: '🚿 Demande d\'Aide à la Toilette'
+  };
+
+  const handleSubmit = async () => {
+    if (!dateSouhaitee) {
+      alert('Veuillez sélectionner une date');
+      return;
+    }
+    
+    const result = await onSubmit(type, undefined, dateSouhaitee, heure || undefined, remarques || undefined);
+    
+    if (result.success) {
+      alert('Demande envoyée avec succès !');
+      onCancel();
+    } else {
+      alert('Erreur: ' + result.error);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-md p-6">
+      <h3 className="text-xl font-semibold text-gray-800 mb-4">
+        {typeLabels[type] || `Demande: ${type}`}
+      </h3>
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Date souhaitée</label>
+          <input 
+            type="date" 
+            value={dateSouhaitee}
+            onChange={(e) => setDateSouhaitee(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-4 py-2" 
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Heure souhaitée (optionnel)</label>
+          <input 
+            type="time" 
+            value={heure}
+            onChange={(e) => setHeure(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-4 py-2" 
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Remarques (optionnel)</label>
+          <textarea 
+            value={remarques}
+            onChange={(e) => setRemarques(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-4 py-2 h-24"
+            placeholder="Précisions ou demandes particulières..."
+          ></textarea>
+        </div>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <p className="text-sm text-blue-800">
+            Cette demande sera envoyée à l'établissement pour validation
+          </p>
+        </div>
+        <div className="flex gap-3">
+          <button 
+            onClick={handleSubmit}
+            disabled={isLoading || !dateSouhaitee}
+            className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white py-2 rounded-lg"
+          >
+            {isLoading ? 'Envoi...' : 'Envoyer la demande'}
+          </button>
+          <button onClick={onCancel} className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 rounded-lg">
             Annuler
           </button>
         </div>
