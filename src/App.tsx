@@ -55,9 +55,14 @@ const DEMO_RESIDENT = {
   prenom: 'Marie',
   date_naissance: '1942-05-15',
   chambre: '205',
-  gir: 3,
+  age: 82,
+  gir: 'GIR 3',
   regime_alimentaire: 'Sans sel',
+  regimeAlimentaire: 'Sans sel',
   code_famille: 'DEMO-FAM',
+  medecin: { nom: 'Dr. Leblanc', tel: '04 72 00 11 22' },
+  proche: { nom: 'Sophie Martin (fille)', tel: '06 12 34 56 78' },
+  besoins: 'Aide à la marche, lunettes de lecture',
   residences: DEMO_RESIDENCE
 };
 
@@ -216,9 +221,48 @@ const DEMO_CAHIER_LIAISON: any[] = [
 ];
 
 const DEMO_RESIDENTS = [
-  { id: 'demo-resident-001', nom: 'Martin', prenom: 'Marie', chambre: '205', gir: 3, regime_alimentaire: 'Sans sel', code_famille: 'DEMO-FAM1' },
-  { id: 'demo-resident-002', nom: 'Dupont', prenom: 'Jean', chambre: '310', gir: 4, regime_alimentaire: 'Diabétique', code_famille: 'DEMO-FAM2' },
-  { id: 'demo-resident-003', nom: 'Bernard', prenom: 'Suzanne', chambre: '108', gir: 2, regime_alimentaire: 'Mixé', code_famille: 'DEMO-FAM3' }
+  { 
+    id: 'demo-resident-001', 
+    nom: 'Martin', 
+    prenom: 'Marie', 
+    chambre: '205', 
+    age: 82,
+    gir: 'GIR 3', 
+    regime_alimentaire: 'Sans sel',
+    regimeAlimentaire: 'Sans sel',
+    code_famille: 'DEMO-FAM1',
+    medecin: { nom: 'Dr. Leblanc', tel: '04 72 00 11 22' },
+    proche: { nom: 'Sophie Martin (fille)', tel: '06 12 34 56 78' },
+    besoins: 'Aide à la marche, lunettes de lecture'
+  },
+  { 
+    id: 'demo-resident-002', 
+    nom: 'Dupont', 
+    prenom: 'Jean', 
+    chambre: '310', 
+    age: 78,
+    gir: 'GIR 4', 
+    regime_alimentaire: 'Diabétique',
+    regimeAlimentaire: 'Diabétique',
+    code_famille: 'DEMO-FAM2',
+    medecin: { nom: 'Dr. Moreau', tel: '04 72 00 33 44' },
+    proche: { nom: 'Pierre Dupont (fils)', tel: '06 98 76 54 32' },
+    besoins: 'Contrôle glycémique quotidien'
+  },
+  { 
+    id: 'demo-resident-003', 
+    nom: 'Bernard', 
+    prenom: 'Suzanne', 
+    chambre: '108', 
+    age: 89,
+    gir: 'GIR 2', 
+    regime_alimentaire: 'Mixé',
+    regimeAlimentaire: 'Mixé',
+    code_famille: 'DEMO-FAM3',
+    medecin: { nom: 'Dr. Petit', tel: '04 72 00 55 66' },
+    proche: { nom: 'Anne Durand (nièce)', tel: '06 11 22 33 44' },
+    besoins: 'Fauteuil roulant, aide complète toilette'
+  }
 ];
 
 // Détection du mode démo via l'URL (multiple méthodes pour robustesse)
