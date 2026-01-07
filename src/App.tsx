@@ -221,15 +221,51 @@ const DEMO_RESIDENTS = [
   { id: 'demo-resident-003', nom: 'Bernard', prenom: 'Suzanne', chambre: '108', gir: 2, regime_alimentaire: 'Mixé', code_famille: 'DEMO-FAM3' }
 ];
 
-// Détection du mode démo via l'URL
-const isDemoMode = () => {
-  return window.location.pathname === '/demo' || window.location.hash === '#/demo';
+// Détection du mode démo via l'URL (multiple méthodes pour robustesse)
+const isDemoMode = (): boolean => {
+  // Vérifier le pathname
+  if (window.location.pathname === '/demo' || window.location.pathname === '/demo/') {
+    return true;
+  }
+  // Vérifier le hash (fallback SPA)
+  if (window.location.hash === '#/demo' || window.location.hash === '#demo') {
+    return true;
+  }
+  // Vérifier les query params (autre fallback)
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('mode') === 'demo') {
+    return true;
+  }
+  return false;
 };
 
 const App = () => {
   // Mode démo (lecture seule, données mockées)
-  const [isDemo, setIsDemo] = useState(isDemoMode());
+  // Initialiser avec la vérification immédiate
+  const [isDemo, setIsDemo] = useState(() => isDemoMode());
   const [demoUserType, setDemoUserType] = useState<'residence' | 'famille' | null>(null);
+  
+  // Re-vérifier le mode démo après le montage et lors des changements d'URL
+  useEffect(() => {
+    const checkDemoMode = () => {
+      const shouldBeDemo = isDemoMode();
+      if (shouldBeDemo !== isDemo) {
+        setIsDemo(shouldBeDemo);
+      }
+    };
+    
+    // Vérifier au montage
+    checkDemoMode();
+    
+    // Écouter les changements d'URL (popstate pour le bouton retour, hashchange pour les hash)
+    window.addEventListener('popstate', checkDemoMode);
+    window.addEventListener('hashchange', checkDemoMode);
+    
+    return () => {
+      window.removeEventListener('popstate', checkDemoMode);
+      window.removeEventListener('hashchange', checkDemoMode);
+    };
+  }, [isDemo]);
   
   // État d'authentification
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -758,6 +794,16 @@ const App = () => {
 
   // Charger toutes les données au démarrage
   const loadAllData = useCallback(async () => {
+    // En mode démo, ne pas faire d'appels API - simuler un rafraîchissement
+    if (isDemo) {
+      setIsLoading(true);
+      setLoadingMessage('Actualisation (démo)...');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      setIsLoading(false);
+      setLoadingMessage('');
+      return;
+    }
+    
     if (!currentUser) return;
     setIsLoading(true);
     setLoadingMessage('Chargement des données...');
@@ -773,14 +819,15 @@ const App = () => {
     
     setIsLoading(false);
     setLoadingMessage('');
-  }, [loadResidents, loadDemandes, loadReclamations, loadAnimations, loadEnquetes, loadCahierLiaison, currentUser]);
+  }, [isDemo, loadResidents, loadDemandes, loadReclamations, loadAnimations, loadEnquetes, loadCahierLiaison, currentUser]);
 
   // Effet pour charger les données au changement d'utilisateur
+  // En mode démo, les données sont déjà chargées via renderDemoChoice, pas besoin d'appel API
   useEffect(() => {
-    if (isAuthenticated && currentUser) {
+    if (!isDemo && isAuthenticated && currentUser) {
       loadAllData();
     }
-  }, [isAuthenticated, currentUser, loadAllData]);
+  }, [isDemo, isAuthenticated, currentUser, loadAllData]);
 
   // ================================================
   // FONCTIONS D'ACTIONS (CRÉER, MODIFIER, SUPPRIMER)
@@ -788,6 +835,41 @@ const App = () => {
 
   // Créer une nouvelle demande (famille)
   const handleCreerDemande = async (type: string, sousType?: string, dateSouhaitee?: string, heure?: string, details?: string) => {
+    // MODE DÉMO : Simulation sans appel API
+    if (isDemo) {
+      setIsLoading(true);
+      setLoadingMessage('Envoi de la demande (démo)...');
+      
+      // Simuler un délai réseau
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      const newDemande: any = {
+        id: `demo-dem-${Date.now()}`,
+        residence_id: DEMO_RESIDENCE.id,
+        resident_id: DEMO_RESIDENT.id,
+        type: type,
+        sous_type: sousType || null,
+        date_demande: new Date().toISOString().split('T')[0],
+        date_souhaitee: dateSouhaitee || null,
+        heure: heure || null,
+        details: details || null,
+        statut: 'en_attente',
+        reponse_residence: null,
+        date_reponse: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        residents: { nom: DEMO_RESIDENT.nom, prenom: DEMO_RESIDENT.prenom, chambre: DEMO_RESIDENT.chambre }
+      };
+      
+      // Ajouter aux données locales
+      setToutesLesDemandes(prev => [newDemande, ...prev]);
+      setDemandesEnAttente(prev => [newDemande, ...prev]);
+      
+      setIsLoading(false);
+      return { success: true, data: newDemande };
+    }
+    
+    // MODE PRODUCTION : Appel Supabase
     if (!currentUser?.resident) return { success: false, error: 'Non connecté' };
     
     setIsLoading(true);
@@ -831,6 +913,36 @@ const App = () => {
 
   // Créer une réclamation (famille)
   const handleCreerReclamation = async (sujet: string, description: string) => {
+    // MODE DÉMO : Simulation sans appel API
+    if (isDemo) {
+      setIsLoading(true);
+      setLoadingMessage('Envoi de la réclamation (démo)...');
+      
+      // Simuler un délai réseau
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      const newReclamation: any = {
+        id: `demo-rec-${Date.now()}`,
+        residence_id: DEMO_RESIDENCE.id,
+        resident_id: DEMO_RESIDENT.id,
+        sujet: sujet,
+        description: description,
+        statut: 'en_cours',
+        reponse: null,
+        date_resolution: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        residents: { nom: DEMO_RESIDENT.nom, prenom: DEMO_RESIDENT.prenom, chambre: DEMO_RESIDENT.chambre }
+      };
+      
+      // Ajouter aux données locales
+      setReclamationsData(prev => [newReclamation, ...prev]);
+      
+      setIsLoading(false);
+      return { success: true, data: newReclamation };
+    }
+    
+    // MODE PRODUCTION : Appel Supabase
     if (!currentUser?.resident) return { success: false, error: 'Non connecté' };
     
     setIsLoading(true);

@@ -1,0 +1,22 @@
+# Configuration Netlify pour SeniorConnect
+
+[build]
+  # Commande de build
+  command = "npm run build"
+  # Dossier de publication
+  publish = "dist"
+
+# Redirection SPA - toutes les routes vers index.html
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Headers de sécurité
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+

@@ -1,0 +1,3 @@
+# Redirection SPA pour Netlify
+# Toutes les routes non-fichiers sont redirigées vers index.html
+/*    /index.html   200
