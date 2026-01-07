@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Calendar, FileText, AlertCircle, Camera, User, Home, Plus, Clock, Euro, CheckCircle, XCircle, Edit, Trash2, Save, Users, CalendarDays, Utensils, ClipboardList, Star, BarChart3, Archive, Send, RefreshCw } from 'lucide-react';
+import { Calendar, FileText, AlertCircle, Camera, User, Home, Plus, Clock, Euro, CheckCircle, XCircle, Edit, Trash2, Save, Users, CalendarDays, Utensils, ClipboardList, Star, BarChart3, Archive, Send, RefreshCw, Building } from 'lucide-react';
 import { Auth } from './components/Auth';
 import { 
   supabase,
@@ -33,7 +33,204 @@ import {
   generateCodeResident
 } from './lib/supabase';
 
+// ========================================
+// DONNÉES MOCKÉES POUR LE MODE DÉMO
+// ========================================
+const DEMO_RESIDENCE = {
+  id: 'demo-residence-001',
+  nom: 'Résidence Les Jardins du Soleil (Démo)',
+  adresse: '123 Avenue des Lilas',
+  ville: 'Lyon',
+  code_postal: '69000',
+  telephone: '04 72 00 00 00',
+  email: 'demo@seniorconnect.fr',
+  code_unique: 'DEMO-2024',
+  validee: true
+};
+
+const DEMO_RESIDENT = {
+  id: 'demo-resident-001',
+  residence_id: 'demo-residence-001',
+  nom: 'Martin',
+  prenom: 'Marie',
+  date_naissance: '1942-05-15',
+  chambre: '205',
+  gir: 3,
+  regime_alimentaire: 'Sans sel',
+  code_famille: 'DEMO-FAM',
+  residences: DEMO_RESIDENCE
+};
+
+// Note: On utilise 'as any' pour les données de démo car elles n'ont pas besoin de respecter strictement les types
+const DEMO_DEMANDES: any[] = [
+  {
+    id: 'demo-dem-001',
+    residence_id: 'demo-residence-001',
+    resident_id: 'demo-resident-001',
+    type: 'menage',
+    sous_type: null,
+    date_demande: new Date().toISOString().split('T')[0],
+    date_souhaitee: new Date(Date.now() + 86400000).toISOString().split('T')[0],
+    heure: '10:00',
+    details: 'Nettoyage complet de la chambre',
+    statut: 'en_attente',
+    reponse_residence: null,
+    date_reponse: null,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    residents: { nom: 'Martin', prenom: 'Marie', chambre: '205' }
+  },
+  {
+    id: 'demo-dem-002',
+    residence_id: 'demo-residence-001',
+    resident_id: 'demo-resident-001',
+    type: 'maintenance',
+    sous_type: 'plomberie',
+    date_demande: new Date().toISOString().split('T')[0],
+    date_souhaitee: null,
+    heure: null,
+    details: 'Fuite au niveau du lavabo',
+    statut: 'en_attente',
+    reponse_residence: null,
+    date_reponse: null,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    residents: { nom: 'Martin', prenom: 'Marie', chambre: '205' }
+  },
+  {
+    id: 'demo-dem-003',
+    residence_id: 'demo-residence-001',
+    resident_id: 'demo-resident-002',
+    type: 'toilette',
+    sous_type: null,
+    date_demande: new Date(Date.now() - 86400000).toISOString().split('T')[0],
+    date_souhaitee: new Date().toISOString().split('T')[0],
+    heure: '08:00',
+    details: 'Aide à la toilette matinale',
+    statut: 'validee',
+    reponse_residence: 'Planifié pour demain matin',
+    date_reponse: new Date().toISOString(),
+    created_at: new Date(Date.now() - 86400000).toISOString(),
+    updated_at: new Date().toISOString(),
+    residents: { nom: 'Dupont', prenom: 'Jean', chambre: '310' }
+  }
+];
+
+const DEMO_RECLAMATIONS: any[] = [
+  {
+    id: 'demo-rec-001',
+    residence_id: 'demo-residence-001',
+    resident_id: 'demo-resident-001',
+    sujet: 'restauration',
+    description: 'Le repas de midi était froid',
+    statut: 'en_cours',
+    reponse: null,
+    date_resolution: null,
+    created_at: new Date(Date.now() - 172800000).toISOString(),
+    updated_at: new Date().toISOString(),
+    residents: { nom: 'Martin', prenom: 'Marie', chambre: '205' }
+  },
+  {
+    id: 'demo-rec-002',
+    residence_id: 'demo-residence-001',
+    resident_id: 'demo-resident-002',
+    sujet: 'maintenance',
+    description: 'La climatisation ne fonctionne pas correctement',
+    statut: 'traitee',
+    reponse: 'Intervention du technicien effectuée',
+    date_resolution: new Date().toISOString(),
+    created_at: new Date(Date.now() - 604800000).toISOString(),
+    updated_at: new Date().toISOString(),
+    residents: { nom: 'Dupont', prenom: 'Jean', chambre: '310' }
+  }
+];
+
+const DEMO_ANIMATIONS: any[] = [
+  {
+    id: 'demo-anim-001',
+    residence_id: 'demo-residence-001',
+    titre: 'Atelier Peinture',
+    description: 'Venez exprimer votre créativité avec nos animateurs',
+    date: new Date(Date.now() + 259200000).toISOString().split('T')[0],
+    heure: '14:30',
+    lieu: 'Salle d\'activités',
+    places_max: 12,
+    actif: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    inscriptions_animations: [{ resident_id: 'demo-resident-001' }, { resident_id: 'demo-resident-002' }]
+  },
+  {
+    id: 'demo-anim-002',
+    residence_id: 'demo-residence-001',
+    titre: 'Concert de Jazz',
+    description: 'Un groupe local vient jouer pour vous',
+    date: new Date(Date.now() + 604800000).toISOString().split('T')[0],
+    heure: '16:00',
+    lieu: 'Salon principal',
+    places_max: 30,
+    actif: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    inscriptions_animations: [{ resident_id: 'demo-resident-001' }]
+  }
+];
+
+const DEMO_ENQUETES: any[] = [
+  {
+    id: 'demo-enq-001',
+    residence_id: 'demo-residence-001',
+    titre: 'Satisfaction des repas - Janvier 2026',
+    description: 'Donnez-nous votre avis sur la qualité des repas',
+    actif: true,
+    archive: false,
+    date_cloture: new Date(Date.now() + 2592000000).toISOString().split('T')[0],
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  }
+];
+
+const DEMO_CAHIER_LIAISON: any[] = [
+  {
+    id: 'demo-cah-001',
+    residence_id: 'demo-residence-001',
+    resident_id: 'demo-resident-001',
+    type_intervenant: 'Infirmière',
+    date: new Date().toISOString().split('T')[0],
+    heure: '09:30',
+    commentaire: 'Tension artérielle normale. Moral excellent.',
+    auteur: 'residence',
+    created_at: new Date().toISOString()
+  },
+  {
+    id: 'demo-cah-002',
+    residence_id: 'demo-residence-001',
+    resident_id: 'demo-resident-001',
+    type_intervenant: 'Kinésithérapeute',
+    date: new Date(Date.now() - 86400000).toISOString().split('T')[0],
+    heure: '11:00',
+    commentaire: 'Séance de rééducation effectuée. Bonne progression.',
+    auteur: 'residence',
+    created_at: new Date(Date.now() - 86400000).toISOString()
+  }
+];
+
+const DEMO_RESIDENTS = [
+  { id: 'demo-resident-001', nom: 'Martin', prenom: 'Marie', chambre: '205', gir: 3, regime_alimentaire: 'Sans sel', code_famille: 'DEMO-FAM1' },
+  { id: 'demo-resident-002', nom: 'Dupont', prenom: 'Jean', chambre: '310', gir: 4, regime_alimentaire: 'Diabétique', code_famille: 'DEMO-FAM2' },
+  { id: 'demo-resident-003', nom: 'Bernard', prenom: 'Suzanne', chambre: '108', gir: 2, regime_alimentaire: 'Mixé', code_famille: 'DEMO-FAM3' }
+];
+
+// Détection du mode démo via l'URL
+const isDemoMode = () => {
+  return window.location.pathname === '/demo' || window.location.hash === '#/demo';
+};
+
 const App = () => {
+  // Mode démo (lecture seule, données mockées)
+  const [isDemo, setIsDemo] = useState(isDemoMode());
+  const [demoUserType, setDemoUserType] = useState<'residence' | 'famille' | null>(null);
+  
   // État d'authentification
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -852,12 +1049,113 @@ const App = () => {
     return { success: false, error: error?.message };
   };
 
-  // Si pas authentifié, afficher l'écran de connexion
-  if (!isAuthenticated) {
+  // ========================================
+  // ÉCRAN DE SÉLECTION DU MODE DÉMO
+  // ========================================
+  const renderDemoChoice = () => (
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-100 flex items-center justify-center p-4">
+      <div className="max-w-4xl w-full">
+        <div className="text-center mb-8">
+          <div className="inline-block bg-amber-100 text-amber-800 px-4 py-2 rounded-full text-sm font-semibold mb-4">
+            🎭 MODE DÉMONSTRATION
+          </div>
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">SeniorConnect</h1>
+          <p className="text-lg text-gray-600">Découvrez l'application en mode démo (lecture seule)</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <button
+            onClick={() => {
+              setDemoUserType('famille');
+              setCurrentUser({ resident: DEMO_RESIDENT, residence: DEMO_RESIDENCE });
+              setResidents(DEMO_RESIDENTS);
+              setToutesLesDemandes(DEMO_DEMANDES);
+              setDemandesEnAttente(DEMO_DEMANDES.filter(d => d.statut === 'en_attente'));
+              setReclamationsData(DEMO_RECLAMATIONS);
+              setAnimationsData(DEMO_ANIMATIONS);
+              setEnquetesData(DEMO_ENQUETES);
+              setCahierLiaisonData(DEMO_CAHIER_LIAISON);
+            }}
+            className="bg-white rounded-2xl shadow-xl p-8 hover:shadow-2xl transition-all hover:scale-105 text-left border-2 border-transparent hover:border-indigo-300"
+          >
+            <div className="w-16 h-16 bg-indigo-100 rounded-xl flex items-center justify-center mb-6">
+              <Users className="text-indigo-600" size={32} />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-3">Espace Famille</h2>
+            <p className="text-gray-600">
+              Découvrez comment les familles peuvent suivre leur proche, faire des demandes et communiquer.
+            </p>
+            <div className="mt-4 text-sm text-indigo-600 font-medium">
+              → Voir la démo famille
+            </div>
+          </button>
+
+          <button
+            onClick={() => {
+              setDemoUserType('residence');
+              setCurrentUser(DEMO_RESIDENCE);
+              setResidents(DEMO_RESIDENTS);
+              setToutesLesDemandes(DEMO_DEMANDES);
+              setDemandesEnAttente(DEMO_DEMANDES.filter(d => d.statut === 'en_attente'));
+              setReclamationsData(DEMO_RECLAMATIONS);
+              setAnimationsData(DEMO_ANIMATIONS);
+              setEnquetesData(DEMO_ENQUETES);
+              setCahierLiaisonData(DEMO_CAHIER_LIAISON);
+            }}
+            className="bg-white rounded-2xl shadow-xl p-8 hover:shadow-2xl transition-all hover:scale-105 text-left border-2 border-transparent hover:border-purple-300"
+          >
+            <div className="w-16 h-16 bg-purple-100 rounded-xl flex items-center justify-center mb-6">
+              <Building className="text-purple-600" size={32} />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-3">Espace Résidence</h2>
+            <p className="text-gray-600">
+              Découvrez comment les résidences gèrent les demandes, animations et la communication.
+            </p>
+            <div className="mt-4 text-sm text-purple-600 font-medium">
+              → Voir la démo résidence
+            </div>
+          </button>
+        </div>
+
+        <div className="text-center">
+          <a
+            href="/"
+            className="text-gray-600 hover:text-gray-800 underline"
+          >
+            ← Retour à la page de connexion
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ========================================
+  // GESTION DU MODE DÉMO
+  // ========================================
+  
+  // Afficher l'écran de sélection démo si on est en mode démo sans userType sélectionné
+  if (isDemo && !demoUserType) {
+    return renderDemoChoice();
+  }
+
+  // Bloquer les écritures en mode démo
+  const blockDemoWrite = (action: string) => {
+    if (isDemo) {
+      alert(`🎭 Mode démo : L'action "${action}" est désactivée.\n\nConnectez-vous avec un vrai compte pour accéder à toutes les fonctionnalités.`);
+      return true;
+    }
+    return false;
+  };
+
+  // Si pas authentifié ET pas en mode démo, afficher l'écran de connexion
+  if (!isAuthenticated && !isDemo) {
     return <Auth onAuthSuccess={handleAuthSuccess} />;
   }
 
-  if (!userType) {
+  // Déterminer le type d'utilisateur effectif (démo ou réel)
+  const effectiveUserType = isDemo ? demoUserType : userType;
+
+  if (!effectiveUserType) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full">
@@ -888,7 +1186,7 @@ const App = () => {
     );
   }
 
-  if (userType === 'residence') {
+  if (effectiveUserType === 'residence') {
     // Compteurs pour le dashboard
     const reclamationsEnCours = reclamationsData.filter(r => r.statut === 'en_cours').length;
     const totalInscriptions = animationsData.reduce((acc, a) => acc + (a.inscriptions_animations?.length || 0), 0);
@@ -2992,117 +3290,143 @@ const App = () => {
       );
     };
 
+    // Fonction pour quitter le mode démo
+    const handleDemoLogout = () => {
+      setDemoUserType(null);
+      setCurrentUser(null);
+      setResidents([]);
+      setToutesLesDemandes([]);
+      setDemandesEnAttente([]);
+      setReclamationsData([]);
+      setAnimationsData([]);
+      setEnquetesData([]);
+      setCahierLiaisonData([]);
+    };
+
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-100">
+        {/* Badge mode démo */}
+        {isDemo && (
+          <div className="bg-amber-500 text-white text-center py-2 text-sm font-medium">
+            🎭 MODE DÉMONSTRATION - Les données affichées sont fictives et la création/modification est désactivée
+          </div>
+        )}
+        
         <div className="bg-white shadow-md">
-          <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-            <h1 className="text-2xl font-bold text-purple-900">SeniorConnect - Espace Résidence</h1>
+          <div className="max-w-7xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-2">
+            <h1 className="text-xl md:text-2xl font-bold text-purple-900 text-center sm:text-left">
+              SeniorConnect - Espace Résidence
+              {isDemo && <span className="ml-2 text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded">(Démo)</span>}
+            </h1>
             <button
-              onClick={handleLogout}
-              className="text-purple-600 hover:text-purple-700 font-semibold"
+              onClick={isDemo ? handleDemoLogout : handleLogout}
+              className="text-purple-600 hover:text-purple-700 font-semibold whitespace-nowrap"
             >
-              Déconnexion
+              {isDemo ? 'Quitter la démo' : 'Déconnexion'}
             </button>
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="flex gap-4 mb-6">
-            <button
-              onClick={() => setActiveResidenceScreen('dashboard')}
-              className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
-                activeResidenceScreen === 'dashboard'
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-white text-purple-600 hover:bg-purple-50'
-              }`}
-            >
-              Dashboard
-            </button>
-            <button
-              onClick={() => setActiveResidenceScreen('animation')}
-              className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
-                activeResidenceScreen === 'animation'
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-white text-purple-600 hover:bg-purple-50'
-              }`}
-            >
-              Animation
-            </button>
-            <button
-              onClick={() => setActiveResidenceScreen('reclamations')}
-              className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
-                activeResidenceScreen === 'reclamations'
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-white text-purple-600 hover:bg-purple-50'
-              }`}
-            >
-              Réclamations
-            </button>
-            <button
-              onClick={() => setActiveResidenceScreen('demandes')}
-              className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
-                activeResidenceScreen === 'demandes'
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-white text-purple-600 hover:bg-purple-50'
-              }`}
-            >
-              Gestion Demandes
-            </button>
-            <button
-              onClick={() => setActiveResidenceScreen('planning')}
-              className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
-                activeResidenceScreen === 'planning'
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-white text-purple-600 hover:bg-purple-50'
-              }`}
-            >
-              <CalendarDays size={18} className="inline mr-2" />
-              Planning
-            </button>
-            <button
-              onClick={() => setActiveResidenceScreen('personnel')}
-              className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
-                activeResidenceScreen === 'personnel'
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-white text-purple-600 hover:bg-purple-50'
-              }`}
-            >
-              <Users size={18} className="inline mr-2" />
-              Personnel
-            </button>
-            <button
-              onClick={() => setActiveResidenceScreen('restauration')}
-              className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
-                activeResidenceScreen === 'restauration'
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-white text-purple-600 hover:bg-purple-50'
-              }`}
-            >
-              <Utensils size={18} className="inline mr-2" />
-              Restauration
-            </button>
-            <button
-              onClick={() => setActiveResidenceScreen('residents')}
-              className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
-                activeResidenceScreen === 'residents'
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-white text-purple-600 hover:bg-purple-50'
-              }`}
-            >
-              <User size={18} className="inline mr-2" />
-              Résidents
-            </button>
-            <button
-              onClick={() => setActiveResidenceScreen('enquetes')}
-              className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
-                activeResidenceScreen === 'enquetes'
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-white text-purple-600 hover:bg-purple-50'
-              }`}
-            >
-              <ClipboardList size={18} className="inline mr-2" />
-              Enquêtes
-            </button>
+        <div className="max-w-7xl mx-auto px-2 sm:px-4 py-4 sm:py-6">
+          {/* Navigation responsive - scrollable horizontalement sur mobile */}
+          <div className="overflow-x-auto pb-2 mb-4 sm:mb-6 -mx-2 px-2">
+            <div className="flex gap-2 sm:gap-4 min-w-max">
+              <button
+                onClick={() => setActiveResidenceScreen('dashboard')}
+                className={`px-3 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold transition-colors text-sm sm:text-base whitespace-nowrap ${
+                  activeResidenceScreen === 'dashboard'
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-white text-purple-600 hover:bg-purple-50'
+                }`}
+              >
+                Dashboard
+              </button>
+              <button
+                onClick={() => setActiveResidenceScreen('animation')}
+                className={`px-3 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold transition-colors text-sm sm:text-base whitespace-nowrap ${
+                  activeResidenceScreen === 'animation'
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-white text-purple-600 hover:bg-purple-50'
+                }`}
+              >
+                Animation
+              </button>
+              <button
+                onClick={() => setActiveResidenceScreen('reclamations')}
+                className={`px-3 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold transition-colors text-sm sm:text-base whitespace-nowrap ${
+                  activeResidenceScreen === 'reclamations'
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-white text-purple-600 hover:bg-purple-50'
+                }`}
+              >
+                Réclamations
+              </button>
+              <button
+                onClick={() => setActiveResidenceScreen('demandes')}
+                className={`px-3 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold transition-colors text-sm sm:text-base whitespace-nowrap ${
+                  activeResidenceScreen === 'demandes'
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-white text-purple-600 hover:bg-purple-50'
+                }`}
+              >
+                Demandes
+              </button>
+              <button
+                onClick={() => setActiveResidenceScreen('planning')}
+                className={`px-3 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold transition-colors text-sm sm:text-base whitespace-nowrap ${
+                  activeResidenceScreen === 'planning'
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-white text-purple-600 hover:bg-purple-50'
+                }`}
+              >
+                <CalendarDays size={16} className="inline mr-1 sm:mr-2" />
+                Planning
+              </button>
+              <button
+                onClick={() => setActiveResidenceScreen('personnel')}
+                className={`px-3 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold transition-colors text-sm sm:text-base whitespace-nowrap ${
+                  activeResidenceScreen === 'personnel'
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-white text-purple-600 hover:bg-purple-50'
+                }`}
+              >
+                <Users size={16} className="inline mr-1 sm:mr-2" />
+                Personnel
+              </button>
+              <button
+                onClick={() => setActiveResidenceScreen('restauration')}
+                className={`px-3 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold transition-colors text-sm sm:text-base whitespace-nowrap ${
+                  activeResidenceScreen === 'restauration'
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-white text-purple-600 hover:bg-purple-50'
+                }`}
+              >
+                <Utensils size={16} className="inline mr-1 sm:mr-2" />
+                Restauration
+              </button>
+              <button
+                onClick={() => setActiveResidenceScreen('residents')}
+                className={`px-3 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold transition-colors text-sm sm:text-base whitespace-nowrap ${
+                  activeResidenceScreen === 'residents'
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-white text-purple-600 hover:bg-purple-50'
+                }`}
+              >
+                <User size={16} className="inline mr-1 sm:mr-2" />
+                Résidents
+              </button>
+              <button
+                onClick={() => setActiveResidenceScreen('enquetes')}
+                className={`px-3 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold transition-colors text-sm sm:text-base whitespace-nowrap ${
+                  activeResidenceScreen === 'enquetes'
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-white text-purple-600 hover:bg-purple-50'
+                }`}
+              >
+                <ClipboardList size={16} className="inline mr-1 sm:mr-2" />
+                Enquêtes
+              </button>
+            </div>
           </div>
 
           {activeResidenceScreen === 'dashboard' && renderResidenceDashboard()}
@@ -4093,21 +4417,44 @@ const App = () => {
     );
   };
 
+  // Fonction pour quitter le mode démo (famille)
+  const handleDemoLogoutFamille = () => {
+    setDemoUserType(null);
+    setCurrentUser(null);
+    setResidents([]);
+    setToutesLesDemandes([]);
+    setDemandesEnAttente([]);
+    setReclamationsData([]);
+    setAnimationsData([]);
+    setEnquetesData([]);
+    setCahierLiaisonData([]);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+      {/* Badge mode démo */}
+      {isDemo && (
+        <div className="bg-amber-500 text-white text-center py-2 text-sm font-medium">
+          🎭 MODE DÉMONSTRATION - Les données affichées sont fictives et la création/modification est désactivée
+        </div>
+      )}
+      
       <div className="bg-white shadow-md">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-indigo-900">SeniorConnect - Espace Famille</h1>
+        <div className="max-w-7xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-2">
+          <h1 className="text-xl md:text-2xl font-bold text-indigo-900 text-center sm:text-left">
+            SeniorConnect - Espace Famille
+            {isDemo && <span className="ml-2 text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded">(Démo)</span>}
+          </h1>
           <button
-            onClick={handleLogout}
-            className="text-indigo-600 hover:text-indigo-700 font-semibold"
+            onClick={isDemo ? handleDemoLogoutFamille : handleLogout}
+            className="text-indigo-600 hover:text-indigo-700 font-semibold whitespace-nowrap"
           >
-            Déconnexion
+            {isDemo ? 'Quitter la démo' : 'Déconnexion'}
           </button>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-4 py-6 sm:py-8">
         {/* Bouton retour si on n'est pas sur le dashboard ou le menu */}
         {activeScreen !== 'home' && activeScreen !== 'menu' && (
           <button
@@ -4129,13 +4476,13 @@ const App = () => {
 
         {/* Navigation principale */}
         {(activeScreen === 'home' || activeScreen === 'menu') && (
-          <div className="flex gap-4 mb-6">
+          <div className="flex gap-2 sm:gap-4 mb-6">
             <button
               onClick={() => {
                 setActiveScreen('home');
                 setActiveFamilyScreen('dashboard');
               }}
-              className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
+              className={`px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold transition-colors text-sm sm:text-base ${
                 activeScreen === 'home'
                   ? 'bg-indigo-600 text-white'
                   : 'bg-white text-indigo-600 hover:bg-indigo-50'
@@ -4148,7 +4495,7 @@ const App = () => {
                 setActiveScreen('menu');
                 setActiveFamilyScreen('menu');
               }}
-              className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
+              className={`px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold transition-colors text-sm sm:text-base ${
                 activeScreen === 'menu'
                   ? 'bg-indigo-600 text-white'
                   : 'bg-white text-indigo-600 hover:bg-indigo-50'
